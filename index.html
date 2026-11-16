@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CapCut Web Studio - Editor de Vídeo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <!-- FFmpeg.wasm (versão compatível sem exigir headers especiais no GitHub Pages) -->
+  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+  <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+  <style>
+    * { box-sizing: border-box; user-select: none; }
+    body {
+      margin: 0;
+      background-color: #0d0d0f;
+      color: #e4e4e7;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #141417; }
+    ::-webkit-scrollbar-thumb { background: #2e2e34; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00e5ff; }
+    input[type="range"] {
+      -webkit-appearance: none;
+      background: #27272a;
+      height: 4px;
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #00e5ff;
+      cursor: pointer;
+    }
+    .clip-handle {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 8px;
+      cursor: ew-resize;
+      background: rgba(255, 255, 255, 0.25);
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .timeline-clip:hover .clip-handle,
+    .timeline-clip.selected .clip-handle {
+      opacity: 1;
+    }
+    .checkerboard {
+      background-image: linear-gradient(45deg, #18181b 25%, transparent 25%),
+                        linear-gradient(-45deg, #18181b 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #18181b 75%),
+                        linear-gradient(-45deg, transparent 75%, #18181b 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    }
+  </style>
+</head>
+<body class="flex flex-col h-screen">
+
+  <!-- TOP HEADER -->
+  <header class="h-12 bg-[#141417] border-b border-[#27272a] flex items-center justify-between px-4 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#00e5ff] to-[#3b82f6] flex items-center justify-center text-black font-black text-sm">
+        <i class="fa-solid fa-scissors"></i>
+      </div>
+      <span class="font-bold text-sm tracking-wide text-white">CapCut <span class="text-[#00e5ff] font-normal">Web Studio</span></span>
+      <span class="text-[11px] bg-[#27272a] text-zinc-400 px-2 py-0.5 rounded">MP4 + Auto-Legendas</span>
+    </div>
+
+    <div class="flex items-center gap-2 text-xs">
+      <button onclick="undo()" title="Desfazer (Ctrl+Z)" class="px-2.5 py-1.5 rounded bg-[#1e1e22] hover:bg-[#2a2a30] text-zinc-300 transition">
+        <i class="fa-solid fa-rotate-left"></i>
+      </button>
+      <button onclick="redo()" title="Refazer (Ctrl+Y)" class="px-2.5 py-1.5 rounded bg-[#1e1e22] hover:bg-[#2a2a30] text-zinc-300 transition">
+        <i class="fa-solid fa-rotate-right"></i>
+      </button>
+      <div class="h-4 w-[1px] bg-[#27272a] mx-1"></div>
+      <span id="project-status" class="text-zinc-400 text-xs">Pronto para editar</span>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <label class="cursor-pointer bg-[#27272a] hover:bg-[#323238] text-white text-xs font-medium px-3 py-1.5 rounded-md flex items-center gap-2 transition">
+        <i class="fa-solid fa-plus text-[#00e5ff]"></i> Importar Mídia
+        <input type="file" id="file-input" multiple accept="video/*,image/*,audio/*" class="hidden" />
+      </label>
+      <button id="btn-export" onclick="openExportModal()" class="bg-[#00e5ff] hover:bg-[#00cce6] text-black font-bold text-xs px-4 py-1.5 rounded-md flex items-center gap-2 transition shadow-lg shadow-[#00e5ff]/20">
+        <i class="fa-solid fa-arrow-up-from-bracket"></i> Exportar MP4
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="w-80 bg-[#141417] border-r border-[#27272a] flex shrink-0">
+      <div class="w-16 bg-[#101012] border-r border-[#27272a] flex flex-col items-center py-3 gap-3.5 shrink-0">
+        <button onclick="switchTab('media')" id="tab-btn-media" class="nav-tab flex flex-col items-center gap-1 text-[#00e5ff] text-[10px] font-medium">
+          <div class="w-9 h-9 rounded-lg bg-[#00e5ff]/15 flex items-center justify-center text-base"><i class="fa-solid fa-photo-film"></i></div>
+          Mídia
+        </button>
+        <button onclick="switchTab('audio')" id="tab-btn-audio" class="nav-tab flex flex-col items-center gap-1 text-zinc-400 hover:text-white text-[10px] font-medium">
+          <div class="w-9 h-9 rounded-lg hover:bg-[#1e1e22] flex items-center justify-center text-base"><i class="fa-solid fa-music"></i></div>
+          Áudio
+        </button>
+        <button onclick="switchTab('text')" id="tab-btn-text" class="nav-tab flex flex-col items-center gap-1 text-zinc-400 hover:text-white text-[10px] font-medium">
+          <div class="w-9 h-9 rounded-lg hover:bg-[#1e1e22] flex items-center justify-center text-base"><i class="fa-solid fa-font"></i></div>
+          Texto
+        </button>
+        <button onclick="switchTab('captions')" id="tab-btn-captions" class="nav-tab flex flex-col items-center gap-1 text-zinc-400 hover:text-white text-[10px] font-medium">
+          <div class="w-9 h-9 rounded-lg hover:bg-[#1e1e22] flex items-center justify-center text-base"><i class="fa-solid fa-closed-captioning"></i></div>
+          Legendas
+        </button>
+        <button onclick="switchTab('stickers')" id="tab-btn-stickers" class="nav-tab flex flex-col items-center gap-1 text-zinc-400 hover:text-white text-[10px] font-medium">
+          <div class="w-9 h-9 rounded-lg hover:bg-[#1e1e22] flex items-center justify-center text-base"><i class="fa-solid fa-face-smile"></i></div>
+          Stickers
+        </button>
+        <button onclick="switchTab('effects')" id="tab-btn-effects" class="nav-tab flex flex-col items-center gap-1 text-zinc-400 hover:text-white text-[10px] font-medium">
+          <div class="w-9 h-9 rounded-lg hover:bg-[#1e1e22] flex items-center justify-center text-base"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+          Filtros
+        </button>
+      </div>
+
+      <div class="flex-1 p-3 overflow-y-auto" id="left-panel-content"></div>
+    </aside>
+
+    <!-- CENTER: VIDEO PREVIEW PLAYER -->
+    <main class="flex-1 bg-[#0a0a0c] flex flex-col items-center justify-between p-3 relative overflow-hidden">
+      <div class="w-full flex items-center justify-between text-xs text-zinc-400 px-2">
+        <span>Player</span>
+        <div class="flex items-center gap-2">
+          <label class="text-[11px]">Proporção:</label>
+          <select id="aspect-ratio-select" onchange="changeAspectRatio(this.value)" class="bg-[#18181b] border border-[#27272a] rounded px-2 py-1 text-xs text-white outline-none">
+            <option value="16:9">16:9 (YouTube)</option>
+            <option value="9:16">9:16 (TikTok / Reels)</option>
+            <option value="1:1">1:1 (Instagram)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex-1 w-full flex items-center justify-center overflow-hidden my-2">
+        <div id="canvas-wrapper" class="relative shadow-2xl border border-[#27272a] checkerboard flex items-center justify-center">
+          <canvas id="preview-canvas" width="960" height="540" class="max-w-full max-h-full cursor-move"></canvas>
+        </div>
+      </div>
+
+      <!-- Playback Controls -->
+      <div class="w-full max-w-2xl bg-[#141417] border border-[#27272a] rounded-lg px-4 py-2 flex items-center justify-between">
+        <div class="font-mono text-xs">
+          <span id="timecode-current" class="text-[#00e5ff] font-bold">00:00.00</span>
+          <span class="text-zinc-500"> / </span>
+          <span id="timecode-total" class="text-zinc-400">00:15.00</span>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <button onclick="seekTo(0)" class="text-zinc-400 hover:text-white transition" title="Início">
+            <i class="fa-solid fa-backward-step"></i>
+          </button>
+          <button id="btn-play-pause" onclick="togglePlay()" class="w-9 h-9 rounded-full bg-white text-black hover:bg-[#00e5ff] flex items-center justify-center transition shadow">
+            <i class="fa-solid fa-play ml-0.5"></i>
+          </button>
+          <button onclick="seekTo(project.duration)" class="text-zinc-400 hover:text-white transition" title="Fim">
+            <i class="fa-solid fa-forward-step"></i>
+          </button>
+        </div>
+
+        <div class="text-[11px] text-zinc-400 flex items-center gap-2">
+          <i class="fa-solid fa-hand-pointer text-[#00e5ff]"></i> Arraste itens na tela
+        </div>
+      </div>
+    </main>
+
+    <!-- RIGHT SIDEBAR: INSPECTOR -->
+    <aside class="w-72 bg-[#141417] border-l border-[#27272a] flex flex-col shrink-0">
+      <div class="h-10 border-b border-[#27272a] px-4 flex items-center justify-between">
+        <span class="text-xs font-bold uppercase tracking-wider text-zinc-300">Inspetor</span>
+        <span id="inspector-badge" class="text-[10px] bg-[#27272a] px-2 py-0.5 rounded text-zinc-400">Nenhum</span>
+      </div>
+      <div id="inspector-content" class="flex-1 p-4 overflow-y-auto space-y-4 text-xs">
+        <div class="text-center text-zinc-500 mt-12">
+          <i class="fa-solid fa-sliders text-2xl mb-2 block opacity-40"></i>
+          Selecione um clipe na timeline para editar propriedades, filtros, Chroma Key e velocidade.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- BOTTOM: MULTI-TRACK TIMELINE -->
+  <section class="h-64 bg-[#121215] border-t border-[#27272a] flex flex-col shrink-0">
+    <div class="h-10 bg-[#16161a] border-b border-[#27272a] px-4 flex items-center justify-between text-xs">
+      <div class="flex items-center gap-2">
+        <button onclick="splitSelectedClip()" class="px-2.5 py-1 rounded bg-[#222227] hover:bg-[#2e2e35] text-zinc-200 flex items-center gap-1.5 transition" title="Dividir na Agulha (Ctrl+B)">
+          <i class="fa-solid fa-scissors text-[#00e5ff]"></i> Dividir
+        </button>
+        <button onclick="duplicateSelectedClip()" class="px-2.5 py-1 rounded bg-[#222227] hover:bg-[#2e2e35] text-zinc-200 flex items-center gap-1.5 transition">
+          <i class="fa-regular fa-copy"></i> Duplicar
+        </button>
+        <button onclick="deleteSelectedClip()" class="px-2.5 py-1 rounded bg-[#222227] hover:bg-red-500/20 hover:text-red-400 text-zinc-200 flex items-center gap-1.5 transition">
+          <i class="fa-regular fa-trash-can"></i> Excluir
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-magnifying-glass-minus text-zinc-400"></i>
+        <input type="range" id="timeline-zoom" min="20" max="150" value="60" oninput="setTimelineZoom(this.value)" class="w-28" />
+        <i class="fa-solid fa-magnifying-glass-plus text-zinc-400"></i>
+      </div>
+    </div>
+
+    <div class="flex-1 flex overflow-hidden relative">
+      <div class="w-36 bg-[#141417] border-r border-[#27272a] flex flex-col shrink-0 z-10">
+        <div class="h-6 border-b border-[#27272a] bg-[#101012]"></div>
+        <div class="h-14 border-b border-[#27272a] px-3 flex items-center gap-2 text-xs text-zinc-300">
+          <i class="fa-solid fa-layer-group text-purple-400"></i> Texto / Legenda
+        </div>
+        <div class="h-16 border-b border-[#27272a] px-3 flex items-center gap-2 text-xs text-zinc-300">
+          <i class="fa-solid fa-film text-[#00e5ff]"></i> Vídeo Principal
+        </div>
+        <div class="h-14 border-b border-[#27272a] px-3 flex items-center gap-2 text-xs text-zinc-300">
+          <i class="fa-solid fa-volume-high text-emerald-400"></i> Áudio
+        </div>
+      </div>
+
+      <div id="timeline-scroll" class="flex-1 overflow-x-auto overflow-y-hidden relative bg-[#0e0e11]">
+        <div id="timeline-inner" class="relative h-full" style="width: 1500px;">
+          <div id="timeline-ruler" class="h-6 border-b border-[#27272a] bg-[#141417] relative cursor-pointer"></div>
+          <div id="track-overlay" class="h-14 border-b border-[#1f1f24] relative"></div>
+          <div id="track-video" class="h-16 border-b border-[#1f1f24] relative bg-[#121216]"></div>
+          <div id="track-audio" class="h-14 border-b border-[#1f1f24] relative"></div>
+          <div id="playhead" class="absolute top-0 bottom-0 w-[2px] bg-[#00e5ff] z-20 pointer-events-none" style="left: 0px;">
+            <div class="w-3 h-3 bg-[#00e5ff] rotate-45 -ml-[5px] -mt-1.5 rounded-xs shadow"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EXPORT MODAL (MP4 VIA FFMPEG.WASM) -->
+  <div id="export-modal" class="fixed inset-0 bg-black/80 backdrop-blur-xs z-50 hidden items-center justify-center">
+    <div class="bg-[#18181b] border border-[#27272a] rounded-xl w-96 p-5 shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-clapperboard text-[#00e5ff]"></i> Exportar Vídeo (MP4 / WebM)
+        </h3>
+        <button onclick="closeExportModal()" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-zinc-400 mb-1">Nome do Arquivo</label>
+          <input type="text" id="export-filename" value="meu_video_capcut" class="w-full bg-[#101012] border border-[#27272a] rounded px-3 py-2 text-white outline-none focus:border-[#00e5ff]" />
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-zinc-400 mb-1">Formato Final</label>
+            <select id="export-format" class="w-full bg-[#101012] border border-[#27272a] rounded px-2 py-2 text-white outline-none">
+              <option value="mp4">MP4 (FFmpeg H.264)</option>
+              <option value="webm">WebM (Rápido)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-zinc-400 mb-1">Taxa de Quadros</label>
+            <select id="export-fps" class="w-full bg-[#101012] border border-[#27272a] rounded px-2 py-2 text-white outline-none">
+              <option value="30">30 FPS</option>
+              <option value="60">60 FPS</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="export-progress-box" class="hidden pt-2">
+          <div class="flex justify-between text-[11px] mb-1">
+            <span id="export-stage" class="text-[#00e5ff]">Capturando quadros...</span>
+            <span id="export-pct">0%</span>
+          </div>
+          <div class="w-full h-2 bg-[#101012] rounded-full overflow-hidden">
+            <div id="export-bar" class="h-full bg-[#00e5ff] transition-all duration-100" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-5 flex justify-end gap-2">
+        <button onclick="closeExportModal()" class="px-4 py-2 rounded bg-[#27272a] text-xs text-zinc-300 hover:bg-[#323238]">Cancelar</button>
+        <button id="btn-start-render" onclick="startVideoExport()" class="px-4 py-2 rounded bg-[#00e5ff] text-black font-bold text-xs hover:bg-[#00cce6]">
+          Exportar Agora
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // ESTADO GLOBAL DO PROJETO
+    // ==========================================
+    const project = {
+      width: 960,
+      height: 540,
+      aspectRatio: '16:9',
+      currentTime: 0,
+      duration: 15,
+      isPlaying: false,
+      zoom: 60,
+      selectedClipId: null,
+      mediaLibrary: [],
+      clips: [],
+      history: [],
+      historyIndex: -1
+    };
+
+    const canvas = document.getElementById('preview-canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    let activeTab = 'media';
+    let lastFrameTime = 0;
+
+    // Estado do Reconhecimento de Voz (Legendas Automáticas)
+    let recognition = null;
+    let isRecordingCaptions = false;
+    let captionStartTime = 0;
+    let liveInterimText = '';
+
+    // Instância FFmpeg.wasm
+    let ffmpegInstance = null;
+
+    // ==========================================
+    // INICIALIZAÇÃO E GERADOR DE AMOSTRAS
+    // ==========================================
+    async function init() {
+      switchTab('media');
+      await generateBuiltInSamples();
+      saveState();
+      renderTimeline();
+      requestAnimationFrame(renderLoop);
+    }
+
+    async function generateBuiltInSamples() {
+      document.getElementById('project-status').textContent = 'Gerando amostras...';
+
+      const videoUrl1 = await createSyntheticVideo('neon', 6);
+      const vidEl1 = await loadVideoElement(videoUrl1);
+      project.mediaLibrary.push({
+        id: 'sample-vid-1',
+        name: 'Intro_Neon_Loop.webm',
+        type: 'video',
+        url: videoUrl1,
+        duration: 6,
+        element: vidEl1
+      });
+
+      const videoUrl2 = await createSyntheticVideo('greenscreen', 5);
+      const vidEl2 = await loadVideoElement(videoUrl2);
+      project.mediaLibrary.push({
+        id: 'sample-vid-2',
+        name: 'ChromaKey_Objeto.webm',
+        type: 'video',
+        url: videoUrl2,
+        duration: 5,
+        element: vidEl2
+      });
+
+      const audioUrl = createSyntheticAudioWav(8);
+      const audioEl = new Audio(audioUrl);
+      project.mediaLibrary.push({
+        id: 'sample-aud-1',
+        name: 'Beat_Eletronico_Synth.wav',
+        type: 'audio',
+        url: audioUrl,
+        duration: 8,
+        element: audioEl
+      });
+
+      addClipFromMedia(project.mediaLibrary[0], 0);
+      addTextClip('CAPCUT WEB STUDIO', 0.5, 4.5, {
+        fontSize: 46,
+        color: '#ffffff',
+        bgColor: '#00e5ff',
+        hasBg: true,
+        y: 0.78
+      });
+      addClipFromMedia(project.mediaLibrary[2], 0);
+
+      document.getElementById('project-status').textContent = 'Pronto para editar';
+      if (activeTab === 'media') switchTab('media');
+    }
+
+    function createSyntheticVideo(style, durationSec) {
+      return new Promise((resolve) => {
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = 640;
+        offCanvas.height = 360;
+        const octx = offCanvas.getContext('2d');
+        const stream = offCanvas.captureStream(30);
+        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        const chunks = [];
+
+        recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          resolve(URL.createObjectURL(blob));
+        };
+
+        recorder.start();
+        let frame = 0;
+        const totalFrames = durationSec * 30;
+
+        const interval = setInterval(() => {
+          const t = frame / 30;
+          if (style === 'neon') {
+            const grad = octx.createLinearGradient(0, 0, 640, 360);
+            grad.addColorStop(0, `hsl(${(t * 60) % 360}, 70%, 18%)`);
+            grad.addColorStop(1, `hsl(${(t * 60 + 120) % 360}, 80%, 10%)`);
+            octx.fillStyle = grad;
+            octx.fillRect(0, 0, 640, 360);
+
+            for (let i = 0; i < 6; i++) {
+              octx.beginPath();
+              octx.arc(320 + Math.cos(t * 2 + i) * 140, 180 + Math.sin(t * 3 + i) * 80, 25 + i * 6, 0, Math.PI * 2);
+              octx.strokeStyle = 'rgba(0, 229, 255, 0.5)';
+              octx.lineWidth = 3;
+              octx.stroke();
+            }
+          } else {
+            octx.fillStyle = '#00ff00';
+            octx.fillRect(0, 0, 640, 360);
+            octx.save();
+            octx.translate(320 + Math.sin(t * 3) * 120, 180);
+            octx.rotate(t * 2);
+            octx.fillStyle = '#ff2a5f';
+            octx.fillRect(-55, -55, 110, 110);
+            octx.fillStyle = '#ffffff';
+            octx.font = 'bold 20px sans-serif';
+            octx.textAlign = 'center';
+            octx.fillText('LIVE', 0, 7);
+            octx.restore();
+          }
+
+          frame++;
+          if (frame >= totalFrames) {
+            clearInterval(interval);
+            recorder.stop();
+          }
+        }, 1000 / 30);
+      });
+    }
+
+    function createSyntheticAudioWav(durationSec) {
+      const sampleRate = 22050;
+      const numSamples = sampleRate * durationSec;
+      const buffer = new ArrayBuffer(44 + numSamples * 2);
+      const view = new DataView(buffer);
+      const writeString = (offset, str) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+      };
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + numSamples * 2, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, numSamples * 2, true);
+
+      const notes = [261.63, 329.63, 392.00, 523.25];
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const beat = Math.floor(t * 4);
+        const freq = notes[beat % notes.length];
+        const env = Math.exp(-(t * 4 - beat) * 4);
+        const sample = Math.sin(2 * Math.PI * freq * t) * env * 0.35;
+        view.setInt16(44 + i * 2, sample * 32767, true);
+      }
+      return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+    }
+
+    function loadVideoElement(url) {
+      return new Promise((resolve) => {
+        const v = document.createElement('video');
+        v.src = url;
+        v.muted = true;
+        v.playsInline = true;
+        v.preload = 'auto';
+        v.onloadedmetadata = () => resolve(v);
+      });
+    }
+
+    // ==========================================
+    // IMPORTAÇÃO DE ARQUIVOS LOCAIS
+    // ==========================================
+    document.getElementById('file-input').addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files);
+      for (const file of files) {
+        const url = URL.createObjectURL(file);
+        if (file.type.startsWith('video/')) {
+          const el = await loadVideoElement(url);
+          project.mediaLibrary.push({ id: 'media-' + Date.now() + Math.random(), name: file.name, type: 'video', url, duration: el.duration || 5, element: el });
+        } else if (file.type.startsWith('image/')) {
+          const img = new Image();
+          img.src = url;
+          await new Promise((r) => (img.onload = r));
+          project.mediaLibrary.push({ id: 'media-' + Date.now() + Math.random(), name: file.name, type: 'image', url, duration: 5, element: img });
+        } else if (file.type.startsWith('audio/')) {
+          const aud = new Audio(url);
+          await new Promise((r) => (aud.onloadedmetadata = r));
+          project.mediaLibrary.push({ id: 'media-' + Date.now() + Math.random(), name: file.name, type: 'audio', url, duration: aud.duration || 5, element: aud });
+        }
+      }
+      switchTab('media');
+    });
+
+    // ==========================================
+    // LEGENDAS AUTOMÁTICAS POR VOZ (WEB SPEECH API)
+    // ==========================================
+    function toggleAutoCaptions() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert('Seu navegador não suporta reconhecimento de voz nativo. Use o Google Chrome ou Microsoft Edge.');
+        return;
+      }
+
+      if (isRecordingCaptions) {
+        isRecordingCaptions = false;
+        if (recognition) recognition.stop();
+        if (project.isPlaying) togglePlay();
+        switchTab('captions');
+        return;
+      }
+
+      const lang = document.getElementById('caption-lang')?.value || 'pt-BR';
+      const stylePreset = document.getElementById('caption-style')?.value || 'tiktok';
+
+      recognition = new SpeechRecognition();
+      recognition.lang = lang;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        isRecordingCaptions = true;
+        captionStartTime = project.currentTime;
+        liveInterimText = '';
+        if (!project.isPlaying) togglePlay();
+        switchTab('captions');
+      };
+
+      recognition.onresult = (event) => {
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript.trim();
+          if (event.results[i].isFinal) {
+            const endTime = project.currentTime;
+            const duration = Math.max(1.2, endTime - captionStartTime);
+            const styles = {
+              tiktok: { fontSize: 38, color: '#000000', bgColor: '#fde047', hasBg: true, y: 0.82 },
+              neon: { fontSize: 38, color: '#ffffff', bgColor: '#00e5ff', hasBg: true, y: 0.82 },
+              classic: { fontSize: 34, color: '#ffffff', bgColor: '#000000', hasBg: true, y: 0.85 }
+            };
+            addTextClip(transcript.toUpperCase(), captionStartTime, duration, styles[stylePreset]);
+            captionStartTime = endTime;
+            liveInterimText = '';
+          } else {
+            interim += transcript;
+            liveInterimText = interim;
+          }
+        }
+        const liveBox = document.getElementById('live-transcript-box');
+        if (liveBox) liveBox.textContent = liveInterimText || 'Ouvindo sua voz...';
+      };
+
+      recognition.onerror = () => {
+        isRecordingCaptions = false;
+        switchTab('captions');
+      };
+
+      recognition.onend = () => {
+        if (isRecordingCaptions) {
+          try { recognition.start(); } catch (e) {}
+        }
+      };
+
+      recognition.start();
+    }
+
+    function generateScriptCaptions() {
+      const rawText = document.getElementById('manual-script-input').value.trim();
+      if (!rawText) return;
+      const sentences = rawText.split(/[\n.!?]+/).map((s) => s.trim()).filter(Boolean);
+      let cursor = project.currentTime;
+      sentences.forEach((sentence) => {
+        const dur = Math.max(1.5, Math.min(4.5, sentence.length * 0.08));
+        addTextClip(sentence.toUpperCase(), cursor, dur, {
+          fontSize: 36,
+          color: '#000000',
+          bgColor: '#fde047',
+          hasBg: true,
+          y: 0.82
+        });
+        cursor += dur + 0.1;
+      });
+      document.getElementById('manual-script-input').value = '';
+    }
+
+    // ==========================================
+    // ABAS DO PAINEL ESQUERDO
+    // ==========================================
+    function switchTab(tab) {
+      activeTab = tab;
+      document.querySelectorAll('.nav-tab').forEach((btn) => {
+        btn.classList.remove('text-[#00e5ff]');
+        btn.classList.add('text-zinc-400');
+      });
+      const activeBtn = document.getElementById(`tab-btn-${tab}`);
+      if (activeBtn) {
+        activeBtn.classList.remove('text-zinc-400');
+        activeBtn.classList.add('text-[#00e5ff]');
+      }
+
+      const container = document.getElementById('left-panel-content');
+      if (tab === 'media') {
+        container.innerHTML = `
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-bold text-zinc-300">Biblioteca do Projeto</span>
+            <span class="text-[10px] text-zinc-500">${project.mediaLibrary.length} itens</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            ${project.mediaLibrary.map((m) => `
+              <div onclick="addMediaById('${m.id}')" class="group bg-[#1b1b20] border border-[#27272a] hover:border-[#00e5ff] rounded-lg p-2 cursor-pointer transition">
+                <div class="h-16 bg-black/50 rounded flex items-center justify-center mb-1.5 relative overflow-hidden">
+                  <i class="fa-solid ${m.type === 'video' ? 'fa-film text-[#00e5ff]' : m.type === 'audio' ? 'fa-music text-emerald-400' : 'fa-image text-amber-400'} text-xl"></i>
+                  <span class="absolute bottom-1 right-1 bg-black/80 text-[9px] px-1 rounded text-zinc-300">${m.duration.toFixed(1)}s</span>
+                  <div class="absolute inset-0 bg-[#00e5ff]/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                    <span class="bg-[#00e5ff] text-black font-bold text-[10px] px-2 py-0.5 rounded">+ Timeline</span>
+                  </div>
+                </div>
+                <p class="text-[11px] text-zinc-300 truncate">${m.name}</p>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (tab === 'captions') {
+        container.innerHTML = `
+          <h4 class="text-xs font-bold text-zinc-300 mb-2 flex items-center gap-1.5">
+            <i class="fa-solid fa-microphone-lines text-[#00e5ff]"></i> Legendas Automáticas
+          </h4>
+          <p class="text-[11px] text-zinc-400 mb-3">Fale no microfone enquanto o vídeo toca para gerar legendas sincronizadas na timeline:</p>
+
+          <div class="space-y-2.5 bg-[#1b1b20] p-3 rounded-lg border border-[#27272a]">
+            <div>
+              <label class="text-[10px] text-zinc-400 block mb-1">Idioma da Fala</label>
+              <select id="caption-lang" class="w-full bg-[#101012] border border-[#27272a] rounded px-2 py-1.5 text-xs text-white outline-none">
+                <option value="pt-BR">Português (Brasil)</option>
+                <option value="en-US">Inglês (EUA)</option>
+                <option value="es-ES">Espanhol</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[10px] text-zinc-400 block mb-1">Estilo Visual</label>
+              <select id="caption-style" class="w-full bg-[#101012] border border-[#27272a] rounded px-2 py-1.5 text-xs text-white outline-none">
+                <option value="tiktok">Amarelo TikTok / Reels</option>
+                <option value="neon">Ciano Neon CapCut</option>
+                <option value="classic">Clássico Fundo Preto</option>
+              </select>
+            </div>
+
+            <button onclick="toggleAutoCaptions()" class="w-full py-2.5 rounded-lg font-bold text-xs flex items-center justify-center gap-2 transition ${isRecordingCaptions ? 'bg-red-500 text-white animate-pulse' : 'bg-[#00e5ff] text-black hover:bg-[#00cce6]'}">
+              <i class="fa-solid ${isRecordingCaptions ? 'fa-stop' : 'fa-microphone'}"></i>
+              ${isRecordingCaptions ? 'Parar Captação de Voz' : 'Iniciar Legenda por Voz'}
+            </button>
+
+            ${isRecordingCaptions ? `<div id="live-transcript-box" class="p-2 bg-black/50 rounded text-[11px] text-[#00e5ff] italic min-h-[36px]">Ouvindo sua voz...</div>` : ''}
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-[#27272a]">
+            <label class="text-[11px] font-bold text-zinc-300 block mb-1.5">Ou cole um roteiro em texto:</label>
+            <textarea id="manual-script-input" rows="3" placeholder="Digite frases separadas por ponto ou linha..." class="w-full bg-[#101012] border border-[#27272a] rounded p-2 text-xs text-white outline-none focus:border-[#00e5ff]"></textarea>
+            <button onclick="generateScriptCaptions()" class="mt-2 w-full py-1.5 rounded bg-[#27272a] hover:bg-[#323238] text-xs text-white font-medium">
+              Gerar Blocos de Legenda
+            </button>
+          </div>
+        `;
+      } else if (tab === 'audio') {
+        const audios = project.mediaLibrary.filter((m) => m.type === 'audio');
+        container.innerHTML = `
+          <h4 class="text-xs font-bold text-zinc-300 mb-3">Trilhas & Efeitos Sonoros</h4>
+          <div class="space-y-2">
+            ${audios.map((a) => `
+              <div onclick="addMediaById('${a.id}')" class="bg-[#1b1b20] hover:border-[#00e5ff] border border-[#27272a] p-2.5 rounded-lg flex items-center justify-between cursor-pointer">
+                <div class="flex items-center gap-2.5 overflow-hidden">
+                  <div class="w-8 h-8 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-wave-square"></i>
+                  </div>
+                  <div class="truncate">
+                    <div class="text-xs text-white truncate">${a.name}</div>
+                    <div class="text-[10px] text-zinc-500">${a.duration.toFixed(1)}s</div>
+                  </div>
+                </div>
+                <i class="fa-solid fa-plus text-[#00e5ff] text-xs"></i>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (tab === 'text') {
+        const templates = [
+          { label: 'Título Padrão', text: 'SEU TEXTO AQUI', color: '#ffffff', bgColor: '#000000', hasBg: false },
+          { label: 'Legenda TikTok', text: 'LEGENDAS DINÂMICAS', color: '#000000', bgColor: '#00e5ff', hasBg: true },
+          { label: 'Alerta Neon', text: 'NOVIDADE 🔥', color: '#fde047', bgColor: '#dc2626', hasBg: true },
+          { label: 'Minimalista', text: 'Capítulo 01', color: '#e4e4e7', bgColor: '#27272a', hasBg: true }
+        ];
+        container.innerHTML = `
+          <h4 class="text-xs font-bold text-zinc-300 mb-3">Modelos de Texto</h4>
+          <div class="space-y-2">
+            ${templates.map((t) => `
+              <div onclick='addTextClip("${t.text}", project.currentTime, 4, ${JSON.stringify(t)})' class="bg-[#1b1b20] hover:border-[#00e5ff] border border-[#27272a] p-3 rounded-lg cursor-pointer flex items-center justify-between">
+                <span class="px-2 py-1 rounded text-xs font-bold" style="color:${t.color}; background:${t.hasBg ? t.bgColor : 'transparent'}">${t.label}</span>
+                <i class="fa-solid fa-plus text-[#00e5ff] text-xs"></i>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (tab === 'stickers') {
+        const emojis = ['🔥', '🚀', '💯', '🎬', '⚡', '❤️', '😂', '👑', '✨', '🎯', '💥', '🎵'];
+        container.innerHTML = `
+          <h4 class="text-xs font-bold text-zinc-300 mb-3">Stickers & Emojis</h4>
+          <div class="grid grid-cols-4 gap-2">
+            ${emojis.map((em) => `
+              <button onclick='addTextClip("${em}", project.currentTime, 3, { fontSize: 72, hasBg: false })' class="h-12 bg-[#1b1b20] hover:bg-[#27272a] border border-[#27272a] rounded-lg text-2xl flex items-center justify-center transition">
+                ${em}
+              </button>
+            `).join('')}
+          </div>
+        `;
+      } else if (tab === 'effects') {
+        const presets = [
+          { name: 'Original', brightness: 100, contrast: 100, saturate: 100, blur: 0 },
+          { name: 'Cinema Moody', brightness: 90, contrast: 130, saturate: 80, blur: 0 },
+          { name: 'Vibrante Pop', brightness: 108, contrast: 115, saturate: 155, blur: 0 },
+          { name: 'Preto & Branco', brightness: 100, contrast: 135, saturate: 0, blur: 0 },
+          { name: 'Sonho Blur', brightness: 110, contrast: 95, saturate: 110, blur: 3 }
+        ];
+        container.innerHTML = `
+          <h4 class="text-xs font-bold text-zinc-300 mb-2">Filtros Rápidos</h4>
+          <div class="space-y-2">
+            ${presets.map((p) => `
+              <button onclick='applyFilterPreset(${JSON.stringify(p)})' class="w-full text-left bg-[#1b1b20] hover:border-[#00e5ff] border border-[#27272a] px-3 py-2.5 rounded-lg text-xs text-zinc-200 flex items-center justify-between">
+                <span>${p.name}</span>
+                <i class="fa-solid fa-wand-magic-sparkles text-[#00e5ff]"></i>
+              </button>
+            `).join('')}
+          </div>
+        `;
+      }
+    }
+
+    // ==========================================
+    // GERENCIAMENTO DE CLIPES E TIMELINE
+    // ==========================================
+    function addMediaById(mediaId) {
+      const media = project.mediaLibrary.find((m) => m.id === mediaId);
+      if (!media) return;
+      addClipFromMedia(media, project.currentTime);
+      saveState();
+      renderTimeline();
+    }
+
+    function addClipFromMedia(media, startTime) {
+      const track = media.type === 'audio' ? 'audio' : (media.type === 'image' ? 'overlay' : 'video');
+      const clip = {
+        id: 'clip-' + Date.now() + Math.random().toString(36).substr(2, 5),
+        mediaId: media.id,
+        name: media.name,
+        type: media.type,
+        track,
+        startTime,
+        duration: media.duration,
+        offset: 0,
+        speed: 1,
+        volume: 1,
+        x: 0.5,
+        y: 0.5,
+        scale: 1,
+        rotation: 0,
+        opacity: 1,
+        brightness: 100,
+        contrast: 100,
+        saturate: 100,
+        blur: 0,
+        chromaKey: false,
+        chromaColor: '#00ff00',
+        chromaTolerance: 95,
+        transition: 'none'
+      };
+      project.clips.push(clip);
+      selectClip(clip.id);
+      updateProjectDuration();
+    }
+
+    function addTextClip(text, startTime, duration, style = {}) {
+      const clip = {
+        id: 'clip-' + Date.now() + Math.random().toString(36).substr(2, 5),
+        name: text.substring(0, 18),
+        type: 'text',
+        track: 'overlay',
+        text,
+        startTime,
+        duration,
+        x: style.x ?? 0.5,
+        y: style.y ?? 0.5,
+        scale: 1,
+        rotation: 0,
+        opacity: 1,
+        fontSize: style.fontSize || 42,
+        color: style.color || '#ffffff',
+        bgColor: style.bgColor || '#000000',
+        hasBg: style.hasBg ?? false,
+        transition: 'fade'
+      };
+      project.clips.push(clip);
+      selectClip(clip.id);
+      updateProjectDuration();
+      saveState();
+      renderTimeline();
+    }
+
+    function updateProjectDuration() {
+      let maxEnd = 10;
+      project.clips.forEach((c) => {
+        if (c.startTime + c.duration > maxEnd) maxEnd = c.startTime + c.duration;
+      });
+      project.duration = Math.ceil(maxEnd + 2);
+      document.getElementById('timecode-total').textContent = formatTime(project.duration);
+    }
+
+    function selectClip(id) {
+      project.selectedClipId = id;
+      renderTimeline();
+      renderInspector();
+    }
+
+    function getSelectedClip() {
+      return project.clips.find((c) => c.id === project.selectedClipId);
+    }
+
+    function splitSelectedClip() {
+      const clip = getSelectedClip();
+      if (!clip) return;
+      const t = project.currentTime;
+      if (t <= clip.startTime + 0.1 || t >= clip.startTime + clip.duration - 0.1) return;
+
+      const firstDur = t - clip.startTime;
+      const secondDur = clip.duration - firstDur;
+
+      const secondClip = JSON.parse(JSON.stringify(clip));
+      secondClip.id = 'clip-' + Date.now();
+      secondClip.startTime = t;
+      secondClip.duration = secondDur;
+      if (secondClip.offset !== undefined) secondClip.offset += firstDur * (clip.speed || 1);
+
+      clip.duration = firstDur;
+      project.clips.push(secondClip);
+      selectClip(secondClip.id);
+      saveState();
+      renderTimeline();
+    }
+
+    function duplicateSelectedClip() {
+      const clip = getSelectedClip();
+      if (!clip) return;
+      const copy = JSON.parse(JSON.stringify(clip));
+      copy.id = 'clip-' + Date.now();
+      copy.startTime = clip.startTime + clip.duration;
+      project.clips.push(copy);
+      selectClip(copy.id);
+      updateProjectDuration();
+      saveState();
+      renderTimeline();
+    }
+
+    function deleteSelectedClip() {
+      if (!project.selectedClipId) return;
+      project.clips = project.clips.filter((c) => c.id !== project.selectedClipId);
+      project.selectedClipId = null;
+      saveState();
+      renderTimeline();
+      renderInspector();
+    }
+
+    function applyFilterPreset(preset) {
+      const clip = getSelectedClip();
+      if (!clip || (clip.type !== 'video' && clip.type !== 'image')) {
+        alert('Selecione primeiro um clipe de vídeo ou imagem na timeline!');
+        return;
+      }
+      Object.assign(clip, preset);
+      saveState();
+      renderInspector();
+    }
+
+    // ==========================================
+    // RENDERIZAÇÃO DA TIMELINE
+    // ==========================================
+    function renderTimeline() {
+      const inner = document.getElementById('timeline-inner');
+      inner.style.width = `${Math.max(1200, project.duration * project.zoom + 200)}px`;
+
+      const ruler = document.getElementById('timeline-ruler');
+      ruler.innerHTML = '';
+      for (let s = 0; s <= project.duration; s++) {
+        const tick = document.createElement('div');
+        tick.className = 'absolute top-0 bottom-0 border-l border-zinc-700 text-[9px] text-zinc-400 pl-1 pt-0.5';
+        tick.style.left = `${s * project.zoom}px`;
+        tick.textContent = `${s}s`;
+        ruler.appendChild(tick);
+      }
+
+      ['overlay', 'video', 'audio'].forEach((t) => {
+        document.getElementById(`track-${t}`).innerHTML = '';
+      });
+
+      project.clips.forEach((clip) => {
+        const trackEl = document.getElementById(`track-${clip.track}`);
+        if (!trackEl) return;
+
+        const el = document.createElement('div');
+        const isSelected = clip.id === project.selectedClipId;
+        const colors = {
+          video: 'bg-[#0e4f5c] border-[#00e5ff]',
+          overlay: 'bg-[#3b1d5e] border-purple-400',
+          audio: 'bg-[#124734] border-emerald-400'
+        };
+
+        el.className = `timeline-clip absolute top-1.5 bottom-1.5 rounded-md border ${colors[clip.track]} ${isSelected ? 'ring-2 ring-white selected z-10' : 'opacity-90'} px-2 flex items-center overflow-hidden cursor-grab`;
+        el.style.left = `${clip.startTime * project.zoom}px`;
+        el.style.width = `${Math.max(18, clip.duration * project.zoom)}px`;
+
+        el.innerHTML = `
+          <div class="clip-handle left-0" data-action="trim-left"></div>
+          <span class="text-[11px] font-medium text-white truncate pointer-events-none">${clip.name}</span>
+          <div class="clip-handle right-0" data-action="trim-right"></div>
+        `;
+
+        el.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          selectClip(clip.id);
+          const action = e.target.dataset.action || 'move';
+          const startX = e.clientX;
+          const origStart = clip.startTime;
+          const origDur = clip.duration;
+
+          const onMove = (mv) => {
+            const dx = (mv.clientX - startX) / project.zoom;
+            if (action === 'move') {
+              clip.startTime = Math.max(0, origStart + dx);
+            } else if (action === 'trim-right') {
+              clip.duration = Math.max(0.3, origDur + dx);
+            } else if (action === 'trim-left') {
+              const newStart = Math.max(0, Math.min(origStart + origDur - 0.3, origStart + dx));
+              clip.duration = origDur - (newStart - origStart);
+              clip.startTime = newStart;
+            }
+            updateProjectDuration();
+            renderTimeline();
+          };
+
+          const onUp = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            saveState();
+          };
+
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+        });
+
+        trackEl.appendChild(el);
+      });
+
+      updatePlayheadUI();
+    }
+
+    document.getElementById('timeline-ruler').addEventListener('mousedown', (e) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const updateNeedle = (ev) => {
+        const x = Math.max(0, ev.clientX - rect.left);
+        seekTo(Math.min(project.duration, x / project.zoom));
+      };
+      updateNeedle(e);
+      const onUp = () => {
+        window.removeEventListener('mousemove', updateNeedle);
+        window.removeEventListener('mouseup', onUp);
+      };
+      window.addEventListener('mousemove', updateNeedle);
+      window.addEventListener('mouseup', onUp);
+    });
+
+    function setTimelineZoom(val) {
+      project.zoom = Number(val);
+      renderTimeline();
+    }
+
+    function updatePlayheadUI() {
+      document.getElementById('playhead').style.left = `${project.currentTime * project.zoom}px`;
+      document.getElementById('timecode-current').textContent = formatTime(project.currentTime);
+    }
+
+    // ==========================================
+    // INSPETOR DE PROPRIEDADES
+    // ==========================================
+    function renderInspector() {
+      const container = document.getElementById('inspector-content');
+      const badge = document.getElementById('inspector-badge');
+      const clip = getSelectedClip();
+
+      if (!clip) {
+        badge.textContent = 'Nenhum';
+        container.innerHTML = `<div class="text-center text-zinc-500 mt-12">Selecione um clipe na timeline para editar.</div>`;
+        return;
+      }
+
+      badge.textContent = clip.type.toUpperCase();
+
+      let html = `
+        <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
+          <div class="font-bold text-zinc-200 flex items-center justify-between">
+            <span>Transformação</span>
+            <button onclick="resetTransform()" class="text-[10px] text-[#00e5ff] hover:underline">Resetar</button>
+          </div>
+          <div>
+            <div class="flex justify-between text-zinc-400 mb-1"><span>Escala</span><span>${Math.round(clip.scale * 100)}%</span></div>
+            <input type="range" min="0.1" max="2.5" step="0.05" value="${clip.scale}" oninput="updateClipProp('scale', parseFloat(this.value))" class="w-full" />
+          </div>
+          <div>
+            <div class="flex justify-between text-zinc-400 mb-1"><span>Rotação</span><span>${clip.rotation}°</span></div>
+            <input type="range" min="-180" max="180" step="1" value="${clip.rotation}" oninput="updateClipProp('rotation', parseInt(this.value))" class="w-full" />
+          </div>
+          <div>
+            <div class="flex justify-between text-zinc-400 mb-1"><span>Opacidade</span><span>${Math.round(clip.opacity * 100)}%</span></div>
+            <input type="range" min="0" max="1" step="0.05" value="${clip.opacity}" oninput="updateClipProp('opacity', parseFloat(this.value))" class="w-full" />
+          </div>
+        </div>
+      `;
+
+      if (clip.type === 'text') {
+        html += `
+          <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
+            <div class="font-bold text-zinc-200">Texto & Legenda</div>
+            <input type="text" value="${clip.text}" oninput="updateClipProp('text', this.value)" class="w-full bg-[#101012] border border-[#27272a] rounded px-2.5 py-1.5 text-white outline-none" />
+            <div>
+              <div class="flex justify-between text-zinc-400 mb-1"><span>Tamanho</span><span>${clip.fontSize}px</span></div>
+              <input type="range" min="18" max="96" value="${clip.fontSize}" oninput="updateClipProp('fontSize', parseInt(this.value))" class="w-full" />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-zinc-400 block mb-1">Cor Texto</label>
+                <input type="color" value="${clip.color}" oninput="updateClipProp('color', this.value)" class="w-full h-7 bg-transparent cursor-pointer" />
+              </div>
+              <div>
+                <label class="text-zinc-400 block mb-1">Cor Fundo</label>
+                <input type="color" value="${clip.bgColor}" oninput="updateClipProp('bgColor', this.value)" class="w-full h-7 bg-transparent cursor-pointer" />
+              </div>
+            </div>
+            <label class="flex items-center gap-2 text-zinc-300 cursor-pointer pt-1">
+              <input type="checkbox" ${clip.hasBg ? 'checked' : ''} onchange="updateClipProp('hasBg', this.checked)" />
+              Ativar Caixa de Fundo
+            </label>
+          </div>
+        `;
+      }
+
+      if (clip.type === 'video' || clip.type === 'image') {
+        html += `
+          <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
+            <div class="font-bold text-zinc-200">Ajustes de Cor</div>
+            <div>
+              <div class="flex justify-between text-zinc-400 mb-1"><span>Brilho</span><span>${clip.brightness}%</span></div>
+              <input type="range" min="20" max="200" value="${clip.brightness}" oninput="updateClipProp('brightness', parseInt(this.value))" class="w-full" />
+            </div>
+            <div>
+              <div class="flex justify-between text-zinc-400 mb-1"><span>Contraste</span><span>${clip.contrast}%</span></div>
+              <input type="range" min="20" max="200" value="${clip.contrast}" oninput="updateClipProp('contrast', parseInt(this.value))" class="w-full" />
+            </div>
+            <div>
+              <div class="flex justify-between text-zinc-400 mb-1"><span>Saturação</span><span>${clip.saturate}%</span></div>
+              <input type="range" min="0" max="200" value="${clip.saturate}" oninput="updateClipProp('saturate', parseInt(this.value))" class="w-full" />
+            </div>
+          </div>
+
+          <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-zinc-200">Chroma Key</span>
+              <input type="checkbox" ${clip.chromaKey ? 'checked' : ''} onchange="updateClipProp('chromaKey', this.checked)" />
+            </div>
+            ${clip.chromaKey ? `
+              <div class="flex items-center justify-between">
+                <span class="text-zinc-400">Cor Alvo</span>
+                <input type="color" value="${clip.chromaColor}" oninput="updateClipProp('chromaColor', this.value)" class="h-6 w-12 bg-transparent" />
+              </div>
+              <div>
+                <div class="flex justify-between text-zinc-400 mb-1"><span>Intensidade</span><span>${clip.chromaTolerance}</span></div>
+                <input type="range" min="20" max="180" value="${clip.chromaTolerance}" oninput="updateClipProp('chromaTolerance', parseInt(this.value))" class="w-full" />
+              </div>
+            ` : '<p class="text-[11px] text-zinc-500">Ative para remover fundo verde.</p>'}
+          </div>
+        `;
+      }
+
+      if (clip.type === 'video' || clip.type === 'audio') {
+        html += `
+          <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
+            <div class="font-bold text-zinc-200">Velocidade & Áudio</div>
+            <div>
+              <div class="flex justify-between text-zinc-400 mb-1"><span>Velocidade</span><span>${clip.speed}x</span></div>
+              <input type="range" min="0.5" max="2.0" step="0.25" value="${clip.speed}" oninput="updateClipProp('speed', parseFloat(this.value))" class="w-full" />
+            </div>
+            <div>
+              <div class="flex justify-between text-zinc-400 mb-1"><span>Volume</span><span>${Math.round(clip.volume * 100)}%</span></div>
+              <input type="range" min="0" max="1" step="0.05" value="${clip.volume}" oninput="updateClipProp('volume', parseFloat(this.value))" class="w-full" />
+            </div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+    }
+
+    function updateClipProp(prop, value) {
+      const clip = getSelectedClip();
+      if (!clip) return;
+      clip[prop] = value;
+      if (prop === 'text') {
+        clip.name = value.substring(0, 18);
+        renderTimeline();
+      }
+      renderInspector();
+    }
+
+    function resetTransform() {
+      const clip = getSelectedClip();
+      if (!clip) return;
+      clip.x = 0.5;
+      clip.y = 0.5;
+      clip.scale = 1;
+      clip.rotation = 0;
+      clip.opacity = 1;
+      renderInspector();
+    }
+
+    // ==========================================
+    // MANIPULAÇÃO DIRETA NO CANVAS
+    // ==========================================
+    canvas.addEventListener('mousedown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clickX = (e.clientX - rect.left) / rect.width;
+      const clickY = (e.clientY - rect.top) / rect.height;
+
+      const visibleClips = project.clips
+        .filter((c) => c.type !== 'audio' && project.currentTime >= c.startTime && project.currentTime <= c.startTime + c.duration)
+        .reverse();
+
+      const hit = visibleClips.find((c) => Math.abs(c.x - clickX) < 0.25 && Math.abs(c.y - clickY) < 0.25);
+      if (hit) {
+        selectClip(hit.id);
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const origX = hit.x;
+        const origY = hit.y;
+
+        const onMove = (mv) => {
+          hit.x = origX + (mv.clientX - startX) / rect.width;
+          hit.y = origY + (mv.clientY - startY) / rect.height;
+        };
+        const onUp = () => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          saveState();
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      }
+    });
+
+    // ==========================================
+    // MOTOR DE RENDERIZAÇÃO (CANVAS + ÁUDIO)
+    // ==========================================
+    function renderLoop(timestamp) {
+      if (!lastFrameTime) lastFrameTime = timestamp;
+      const dt = (timestamp - lastFrameTime) / 1000;
+      lastFrameTime = timestamp;
+
+      if (project.isPlaying) {
+        project.currentTime += dt;
+        if (project.currentTime >= project.duration) {
+          project.currentTime = 0;
+          togglePlay();
+        }
+        updatePlayheadUI();
+      }
+
+      syncMediaElements();
+      drawCanvasFrame();
+      requestAnimationFrame(renderLoop);
+    }
+
+    function syncMediaElements() {
+      project.clips.forEach((clip) => {
+        const media = project.mediaLibrary.find((m) => m.id === clip.mediaId);
+        if (!media || !media.element) return;
+        const el = media.element;
+        const active = project.currentTime >= clip.startTime && project.currentTime <= clip.startTime + clip.duration;
+
+        if (active) {
+          const targetTime = ((project.currentTime - clip.startTime) * (clip.speed || 1) + (clip.offset || 0)) % media.duration;
+          el.volume = clip.volume ?? 1;
+          el.playbackRate = clip.speed || 1;
+
+          if (project.isPlaying) {
+            if (el.paused) el.play().catch(() => {});
+            if (Math.abs(el.currentTime - targetTime) > 0.25) el.currentTime = targetTime;
+          } else {
+            if (!el.paused) el.pause();
+            if (Math.abs(el.currentTime - targetTime) > 0.05) el.currentTime = targetTime;
+          }
+        } else {
+          if (!el.paused) el.pause();
+        }
+      });
+    }
+
+    function drawCanvasFrame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ['video', 'overlay'].forEach((trackName) => {
+        const activeClips = project.clips.filter(
+          (c) => c.track === trackName && project.currentTime >= c.startTime && project.currentTime <= c.startTime + c.duration
+        );
+
+        activeClips.forEach((clip) => {
+          ctx.save();
+          const localTime = project.currentTime - clip.startTime;
+
+          let animOpacity = clip.opacity ?? 1;
+          let animScale = clip.scale ?? 1;
+          if (clip.transition === 'fade' && localTime < 0.4) animOpacity *= localTime / 0.4;
+          else if (clip.transition === 'zoom' && localTime < 0.4) animScale *= 0.7 + 0.3 * (localTime / 0.4);
+
+          ctx.globalAlpha = Math.max(0, Math.min(1, animOpacity));
+          ctx.translate(clip.x * canvas.width, clip.y * canvas.height);
+          ctx.rotate(((clip.rotation || 0) * Math.PI) / 180);
+          ctx.scale(animScale, animScale);
+
+          if (clip.type === 'video' || clip.type === 'image') {
+            const media = project.mediaLibrary.find((m) => m.id === clip.mediaId);
+            if (media && media.element) {
+              ctx.filter = `brightness(${clip.brightness}%) contrast(${clip.contrast}%) saturate(${clip.saturate}%) blur(${clip.blur || 0}px)`;
+              const w = canvas.width;
+              const h = canvas.height;
+              if (clip.chromaKey) {
+                drawWithChromaKey(media.element, -w / 2, -h / 2, w, h, clip.chromaColor, clip.chromaTolerance);
+              } else {
+                ctx.drawImage(media.element, -w / 2, -h / 2, w, h);
+              }
+            }
+          } else if (clip.type === 'text') {
+            ctx.font = `bold ${clip.fontSize}px Inter, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (clip.hasBg) {
+              const metrics = ctx.measureText(clip.text);
+              const padX = 20;
+              const padY = 12;
+              ctx.fillStyle = clip.bgColor;
+              ctx.beginPath();
+              ctx.roundRect(-metrics.width / 2 - padX, -clip.fontSize / 2 - padY / 2, metrics.width + padX * 2, clip.fontSize + padY, 8);
+              ctx.fill();
+            }
+
+            ctx.fillStyle = clip.color;
+            ctx.fillText(clip.text, 0, 0);
+          }
+
+          if (clip.id === project.selectedClipId && !project.isPlaying) {
+            ctx.strokeStyle = '#00e5ff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.strokeRect(-140, -45, 280, 90);
+          }
+
+          ctx.restore();
+        });
+      });
+    }
+
+    const chromaCanvas = document.createElement('canvas');
+    const chromaCtx = chromaCanvas.getContext('2d', { willReadFrequently: true });
+
+    function drawWithChromaKey(source, dx, dy, dw, dh, hexColor, tolerance) {
+      chromaCanvas.width = 320;
+      chromaCanvas.height = 180;
+      chromaCtx.drawImage(source, 0, 0, 320, 180);
+      const imgData = chromaCtx.getImageData(0, 0, 320, 180);
+      const data = imgData.data;
+
+      const rTarget = parseInt(hexColor.substr(1, 2), 16);
+      const gTarget = parseInt(hexColor.substr(3, 2), 16);
+      const bTarget = parseInt(hexColor.substr(5, 2), 16);
+
+      for (let i = 0; i < data.length; i += 4) {
+        const dist = Math.sqrt((data[i] - rTarget) ** 2 + (data[i + 1] - gTarget) ** 2 + (data[i + 2] - bTarget) ** 2);
+        if (dist < tolerance) data[i + 3] = 0;
+      }
+      chromaCtx.putImageData(imgData, 0, 0);
+      ctx.drawImage(chromaCanvas, dx, dy, dw, dh);
+    }
+
+    // ==========================================
+    // EXPORTAÇÃO MP4 VIA FFMPEG.WASM
+    // ==========================================
+    function openExportModal() {
+      if (project.isPlaying) togglePlay();
+      document.getElementById('export-modal').classList.remove('hidden');
+      document.getElementById('export-modal').classList.add('flex');
+    }
+
+    function closeExportModal() {
+      document.getElementById('export-modal').classList.add('hidden');
+      document.getElementById('export-modal').classList.remove('flex');
+    }
+
+    async function convertWebmToMp4(webmBlob, onProgress) {
+      const { FFmpeg } = FFmpegWASM;
+      const { fetchFile, toBlobURL } = FFmpegUtil;
+
+      if (!ffmpegInstance) {
+        ffmpegInstance = new FFmpeg();
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+        await ffmpegInstance.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
+        });
+      }
+
+      ffmpegInstance.on('progress', ({ progress }) => {
+        if (onProgress) onProgress(Math.round(progress * 100));
+      });
+
+      await ffmpegInstance.writeFile('input.webm', await fetchFile(webmBlob));
+      await ffmpegInstance.exec(['-i', 'input.webm', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', 'output.mp4']);
+      const data = await ffmpegInstance.readFile('output.mp4');
+      return new Blob([data.buffer], { type: 'video/mp4' });
+    }
+
+    async function startVideoExport() {
+      const fps = parseInt(document.getElementById('export-fps').value);
+      const format = document.getElementById('export-format').value;
+      const filename = document.getElementById('export-filename').value || 'video_exportado';
+      const progressBox = document.getElementById('export-progress-box');
+      const bar = document.getElementById('export-bar');
+      const pct = document.getElementById('export-pct');
+      const stage = document.getElementById('export-stage');
+
+      progressBox.classList.remove('hidden');
+      document.getElementById('btn-start-render').disabled = true;
+      stage.textContent = 'Gravando quadros do canvas...';
+
+      let renderEnd = 3;
+      project.clips.forEach((c) => {
+        if (c.startTime + c.duration > renderEnd) renderEnd = c.startTime + c.duration;
+      });
+
+      const stream = canvas.captureStream(fps);
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      const chunks = [];
+
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = async () => {
+        const webmBlob = new Blob(chunks, { type: 'video/webm' });
+        let finalBlob = webmBlob;
+        let finalExt = 'webm';
+
+        if (format === 'mp4') {
+          try {
+            stage.textContent = 'Convertendo para MP4 (FFmpeg.wasm)...';
+            bar.style.width = '50%';
+            pct.textContent = '50%';
+            finalBlob = await convertWebmToMp4(webmBlob, (p) => {
+              const totalP = Math.min(99, 50 + Math.round(p / 2));
+              bar.style.width = `${totalP}%`;
+              pct.textContent = `${totalP}%`;
+            });
+            finalExt = 'mp4';
+          } catch (err) {
+            console.warn('Fallback para WebM:', err);
+            stage.textContent = 'Salvando em WebM...';
+          }
+        }
+
+        const url = URL.createObjectURL(finalBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.${finalExt}`;
+        a.click();
+
+        progressBox.classList.add('hidden');
+        document.getElementById('btn-start-render').disabled = false;
+        closeExportModal();
+      };
+
+      seekTo(0);
+      project.isPlaying = true;
+      recorder.start();
+
+      const checkInterval = setInterval(() => {
+        const p = Math.min(100, Math.round((project.currentTime / renderEnd) * 100));
+        const displayP = format === 'mp4' ? Math.round(p / 2) : p;
+        bar.style.width = `${displayP}%`;
+        pct.textContent = `${displayP}%`;
+
+        if (project.currentTime >= renderEnd) {
+          clearInterval(checkInterval);
+          project.isPlaying = false;
+          recorder.stop();
+          seekTo(0);
+        }
+      }, 100);
+    }
+
+    // ==========================================
+    // CONTROLES GERAIS E ATALHOS
+    // ==========================================
+    function togglePlay() {
+      project.isPlaying = !project.isPlaying;
+      const btn = document.getElementById('btn-play-pause');
+      btn.innerHTML = project.isPlaying
+        ? '<i class="fa-solid fa-pause"></i>'
+        : '<i class="fa-solid fa-play ml-0.5"></i>';
+    }
+
+    function seekTo(time) {
+      project.currentTime = Math.max(0, Math.min(project.duration, time));
+      updatePlayheadUI();
+      syncMediaElements();
+    }
+
+    function changeAspectRatio(ratio) {
+      project.aspectRatio = ratio;
+      if (ratio === '16:9') { canvas.width = 960; canvas.height = 540; }
+      else if (ratio === '9:16') { canvas.width = 405; canvas.height = 720; }
+      else { canvas.width = 600; canvas.height = 600; }
+    }
+
+    function saveState() {
+      const snapshot = JSON.stringify(project.clips);
+      project.history = project.history.slice(0, project.historyIndex + 1);
+      project.history.push(snapshot);
+      project.historyIndex++;
+    }
+
+    function undo() {
+      if (project.historyIndex > 0) {
+        project.historyIndex--;
+        project.clips = JSON.parse(project.history[project.historyIndex]);
+        renderTimeline();
+        renderInspector();
+      }
+    }
+
+    function redo() {
+      if (project.historyIndex < project.history.length - 1) {
+        project.historyIndex++;
+        project.clips = JSON.parse(project.history[project.historyIndex]);
+        renderTimeline();
+        renderInspector();
+      }
+    }
+
+    function formatTime(sec) {
+      const mins = Math.floor(sec / 60).toString().padStart(2, '0');
+      const secs = Math.floor(sec % 60).toString().padStart(2, '0');
+      const ms = Math.floor((sec % 1) * 100).toString().padStart(2, '0');
+      return `${mins}:${secs}.${ms}`;
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+      if (e.code === 'Delete' || e.code === 'Backspace') deleteSelectedClip();
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') { e.preventDefault(); splitSelectedClip(); }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); }
+    });
+
+    init();
+  </script>
+</body>
+</html>
