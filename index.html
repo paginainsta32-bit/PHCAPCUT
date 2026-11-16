@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>CapCut Web Studio - Editor Responsivo</title>
+  <title>CapCut Web Studio Pro - Editor Completo</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=Inter:wght@400;700;900&family=Playfair+Display:wght@700&family=Space+Mono:wght@700&display=swap" rel="stylesheet" />
   <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
   <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
   <style>
@@ -26,14 +27,14 @@
     input[type="range"] {
       -webkit-appearance: none;
       background: #27272a;
-      height: 6px;
+      height: 5px;
       border-radius: 3px;
       outline: none;
     }
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
       background: #00e5ff;
       cursor: pointer;
@@ -52,9 +53,7 @@
       justify-content: center;
     }
     .timeline-clip:hover .clip-handle,
-    .timeline-clip.selected .clip-handle {
-      opacity: 1;
-    }
+    .timeline-clip.selected .clip-handle { opacity: 1; }
     .checkerboard {
       background-image: linear-gradient(45deg, #18181b 25%, transparent 25%),
                         linear-gradient(-45deg, #18181b 25%, transparent 25%),
@@ -75,7 +74,7 @@
       <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#00e5ff] to-[#3b82f6] flex items-center justify-center text-black font-black text-sm shrink-0">
         <i class="fa-solid fa-scissors"></i>
       </div>
-      <span class="font-bold text-xs sm:text-sm tracking-wide text-white truncate">CapCut <span class="text-[#00e5ff] font-normal hidden xs:inline">Studio</span></span>
+      <span class="font-bold text-xs sm:text-sm tracking-wide text-white truncate">CapCut <span class="text-[#00e5ff] font-normal">Pro Studio</span></span>
     </div>
 
     <div class="flex items-center gap-1.5 text-xs">
@@ -85,7 +84,10 @@
       <button onclick="redo()" title="Refazer (Ctrl+Y)" class="p-2 rounded bg-[#1e1e22] hover:bg-[#2a2a30] text-zinc-300 transition">
         <i class="fa-solid fa-rotate-right"></i>
       </button>
-      <span id="project-status" class="text-zinc-400 text-[11px] hidden md:inline ml-2">Pronto</span>
+      <button onclick="toggleKeyframeAtPlayhead()" title="Adicionar/Remover Keyframe ◇" class="px-2.5 py-1.5 rounded bg-[#1e1e22] hover:bg-[#2a2a30] text-[#00e5ff] border border-[#00e5ff]/30 flex items-center gap-1 transition">
+        <i class="fa-solid fa-diamond text-[10px]"></i>
+        <span class="hidden sm:inline text-[11px]">Keyframe</span>
+      </button>
     </div>
 
     <div class="flex items-center gap-1.5 sm:gap-2">
@@ -104,9 +106,9 @@
   <!-- MAIN WORKSPACE -->
   <div class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
 
-    <!-- DESKTOP LEFT SIDEBAR (Oculta no Mobile, vira Bottom Drawer) -->
+    <!-- DESKTOP LEFT SIDEBAR -->
     <aside class="hidden lg:flex w-80 bg-[#141417] border-r border-[#27272a] shrink-0">
-      <div class="w-16 bg-[#101012] border-r border-[#27272a] flex flex-col items-center py-3 gap-3.5 shrink-0">
+      <div class="w-16 bg-[#101012] border-r border-[#27272a] flex flex-col items-center py-3 gap-3 shrink-0 overflow-y-auto no-scrollbar">
         <button onclick="switchTab('media')" data-tab="media" class="nav-tab flex flex-col items-center gap-1 text-[#00e5ff] text-[10px] font-medium">
           <div class="w-9 h-9 rounded-lg bg-[#00e5ff]/15 flex items-center justify-center text-base"><i class="fa-solid fa-photo-film"></i></div>
           Mídia
@@ -131,12 +133,16 @@
           <div class="w-9 h-9 rounded-lg hover:bg-[#1e1e22] flex items-center justify-center text-base"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
           Filtros
         </button>
+        <button onclick="switchTab('canvas')" data-tab="canvas" class="nav-tab flex flex-col items-center gap-1 text-zinc-400 hover:text-white text-[10px] font-medium">
+          <div class="w-9 h-9 rounded-lg hover:bg-[#1e1e22] flex items-center justify-center text-base"><i class="fa-solid fa-fill-drip"></i></div>
+          Fundo
+        </button>
       </div>
       <div class="flex-1 p-3 overflow-y-auto" id="desktop-left-content"></div>
     </aside>
 
     <!-- CENTER: VIDEO PREVIEW PLAYER -->
-    <main class="flex-1 bg-[#0a0a0c] flex flex-col items-center justify-between p-2 sm:p-3 relative overflow-hidden min-h-[210px]">
+    <main class="flex-1 bg-[#0a0a0c] flex flex-col items-center justify-between p-2 sm:p-3 relative overflow-hidden min-h-[200px]">
       <div class="w-full flex items-center justify-between text-xs text-zinc-400 px-1">
         <span class="text-[11px] font-medium text-zinc-400">Preview</span>
         <div class="flex items-center gap-1.5">
@@ -144,6 +150,7 @@
             <option value="16:9">16:9 YouTube</option>
             <option value="9:16">9:16 TikTok/Reels</option>
             <option value="1:1">1:1 Quadrado</option>
+            <option value="4:5">4:5 Feed IG</option>
           </select>
         </div>
       </div>
@@ -181,22 +188,35 @@
       </div>
     </main>
 
-    <!-- DESKTOP RIGHT SIDEBAR: INSPECTOR -->
-    <aside class="hidden lg:flex w-72 bg-[#141417] border-l border-[#27272a] flex-col shrink-0">
-      <div class="h-10 border-b border-[#27272a] px-4 flex items-center justify-between">
-        <span class="text-xs font-bold uppercase tracking-wider text-zinc-300">Inspetor</span>
+    <!-- DESKTOP RIGHT SIDEBAR: ADVANCED INSPECTOR -->
+    <aside class="hidden lg:flex w-80 bg-[#141417] border-l border-[#27272a] flex-col shrink-0">
+      <div class="h-10 border-b border-[#27272a] px-3 flex items-center justify-between shrink-0">
+        <span class="text-xs font-bold uppercase tracking-wider text-zinc-300">Configurações</span>
         <span id="inspector-badge" class="text-[10px] bg-[#27272a] px-2 py-0.5 rounded text-zinc-400">Nenhum</span>
       </div>
-      <div id="desktop-inspector-content" class="flex-1 p-4 overflow-y-auto space-y-4 text-xs"></div>
+      <!-- Inspector Sub-Tabs -->
+      <div id="inspector-subtabs" class="grid grid-cols-4 border-b border-[#27272a] bg-[#101012] text-[11px] font-medium shrink-0">
+        <button onclick="setInspectorTab('basic')" data-itab="basic" class="itab-btn py-2 text-[#00e5ff] border-b-2 border-[#00e5ff]">Básico</button>
+        <button onclick="setInspectorTab('color')" data-itab="color" class="itab-btn py-2 text-zinc-400 hover:text-white">Cor / Efeito</button>
+        <button onclick="setInspectorTab('anim')" data-itab="anim" class="itab-btn py-2 text-zinc-400 hover:text-white">Animação</button>
+        <button onclick="setInspectorTab('audio')" data-itab="audio" class="itab-btn py-2 text-zinc-400 hover:text-white">Áudio</button>
+      </div>
+      <div id="desktop-inspector-content" class="flex-1 p-3.5 overflow-y-auto space-y-3 text-xs"></div>
     </aside>
 
-    <!-- MOBILE SLIDE-UP DRAWER (Ferramentas e Inspetor no Celular) -->
-    <div id="mobile-drawer" class="lg:hidden fixed inset-x-0 bottom-14 bg-[#16161a] border-t border-[#2e2e36] rounded-t-2xl shadow-2xl z-40 transform translate-y-full transition-transform duration-200 max-h-[52dvh] flex flex-col">
+    <!-- MOBILE SLIDE-UP DRAWER -->
+    <div id="mobile-drawer" class="lg:hidden fixed inset-x-0 bottom-14 bg-[#16161a] border-t border-[#2e2e36] rounded-t-2xl shadow-2xl z-40 transform translate-y-full transition-transform duration-200 max-h-[58dvh] flex flex-col">
       <div class="h-10 px-4 border-b border-[#27272a] flex items-center justify-between shrink-0">
         <span id="mobile-drawer-title" class="text-xs font-bold text-white uppercase tracking-wider">Ferramentas</span>
         <button onclick="closeMobileDrawer()" class="w-7 h-7 rounded-full bg-[#27272a] text-zinc-300 flex items-center justify-center">
           <i class="fa-solid fa-chevron-down text-xs"></i>
         </button>
+      </div>
+      <div id="mobile-inspector-subtabs" class="hidden grid-cols-4 border-b border-[#27272a] bg-[#101012] text-[11px] font-medium shrink-0">
+        <button onclick="setInspectorTab('basic')" data-itab="basic" class="itab-btn py-2 text-[#00e5ff] border-b-2 border-[#00e5ff]">Básico</button>
+        <button onclick="setInspectorTab('color')" data-itab="color" class="itab-btn py-2 text-zinc-400">Cor / Efeito</button>
+        <button onclick="setInspectorTab('anim')" data-itab="anim" class="itab-btn py-2 text-zinc-400">Animação</button>
+        <button onclick="setInspectorTab('audio')" data-itab="audio" class="itab-btn py-2 text-zinc-400">Áudio</button>
       </div>
       <div id="mobile-drawer-content" class="flex-1 p-3.5 overflow-y-auto text-xs"></div>
     </div>
@@ -211,13 +231,16 @@
           <i class="fa-solid fa-scissors text-[#00e5ff]"></i> <span>Dividir</span>
         </button>
         <button onclick="duplicateSelectedClip()" class="px-2 py-1 rounded bg-[#222227] hover:bg-[#2e2e35] text-zinc-200 flex items-center gap-1 transition shrink-0">
-          <i class="fa-regular fa-copy"></i> <span class="hidden xs:inline">Duplicar</span>
+          <i class="fa-regular fa-copy"></i> <span class="hidden sm:inline">Duplicar</span>
+        </button>
+        <button onclick="extractAudioFromSelected()" class="px-2 py-1 rounded bg-[#222227] hover:bg-[#2e2e35] text-zinc-200 flex items-center gap-1 transition shrink-0" title="Separar áudio para trilha própria">
+          <i class="fa-solid fa-wave-square text-emerald-400"></i> <span class="hidden md:inline">Extrair Áudio</span>
         </button>
         <button onclick="deleteSelectedClip()" class="px-2 py-1 rounded bg-[#222227] hover:bg-red-500/20 hover:text-red-400 text-zinc-200 flex items-center gap-1 transition shrink-0">
-          <i class="fa-regular fa-trash-can"></i> <span class="hidden xs:inline">Excluir</span>
+          <i class="fa-regular fa-trash-can"></i> <span class="hidden sm:inline">Excluir</span>
         </button>
         <button onclick="openMobileInspector()" class="lg:hidden px-2.5 py-1 rounded bg-[#00e5ff]/15 border border-[#00e5ff]/40 text-[#00e5ff] font-medium flex items-center gap-1 transition shrink-0">
-          <i class="fa-solid fa-sliders"></i> Editar Clipe
+          <i class="fa-solid fa-sliders"></i> Configurar Clipe
         </button>
       </div>
 
@@ -230,16 +253,15 @@
 
     <!-- Timeline Tracks Container -->
     <div class="flex-1 flex overflow-hidden relative">
-      <!-- Compact Track Headers -->
       <div class="w-11 sm:w-32 bg-[#141417] border-r border-[#27272a] flex flex-col shrink-0 z-10">
         <div class="h-6 border-b border-[#27272a] bg-[#101012]"></div>
         <div class="flex-1 border-b border-[#27272a] px-2 flex items-center justify-center sm:justify-start gap-2 text-xs text-zinc-300">
           <i class="fa-solid fa-layer-group text-purple-400"></i>
-          <span class="hidden sm:inline truncate">Texto / Overlay</span>
+          <span class="hidden sm:inline truncate">Texto / Camada</span>
         </div>
         <div class="flex-1 border-b border-[#27272a] px-2 flex items-center justify-center sm:justify-start gap-2 text-xs text-zinc-300">
           <i class="fa-solid fa-film text-[#00e5ff]"></i>
-          <span class="hidden sm:inline truncate">Vídeo</span>
+          <span class="hidden sm:inline truncate">Vídeo Principal</span>
         </div>
         <div class="flex-1 border-b border-[#27272a] px-2 flex items-center justify-center sm:justify-start gap-2 text-xs text-zinc-300">
           <i class="fa-solid fa-volume-high text-emerald-400"></i>
@@ -247,7 +269,6 @@
         </div>
       </div>
 
-      <!-- Scrollable Tracks & Ruler -->
       <div id="timeline-scroll" class="flex-1 overflow-x-auto overflow-y-hidden relative bg-[#0e0e11]">
         <div id="timeline-inner" class="relative h-full flex flex-col" style="width: 1500px;">
           <div id="timeline-ruler" class="h-6 border-b border-[#27272a] bg-[#141417] relative cursor-pointer shrink-0 touch-none"></div>
@@ -255,7 +276,6 @@
           <div id="track-video" class="flex-1 border-b border-[#1f1f24] relative bg-[#121216]"></div>
           <div id="track-audio" class="flex-1 border-b border-[#1f1f24] relative"></div>
 
-          <!-- Playhead Needle -->
           <div id="playhead" class="absolute top-0 bottom-0 w-[2px] bg-[#00e5ff] z-20 pointer-events-none" style="left: 0px;">
             <div class="w-3.5 h-3.5 bg-[#00e5ff] rotate-45 -ml-[6px] -mt-1.5 rounded-xs shadow"></div>
           </div>
@@ -264,31 +284,28 @@
     </div>
   </section>
 
-  <!-- MOBILE BOTTOM NAVIGATION BAR (Estilo App CapCut) -->
-  <nav class="lg:hidden h-14 bg-[#101012] border-t border-[#27272a] flex items-center justify-around px-1 shrink-0 z-50">
-    <button onclick="openMobileTab('media', 'Biblioteca de Mídia')" class="flex flex-col items-center justify-center gap-0.5 text-zinc-300 hover:text-[#00e5ff] text-[10px] py-1 px-2">
-      <i class="fa-solid fa-photo-film text-base text-[#00e5ff]"></i>
-      <span>Mídia</span>
+  <!-- MOBILE BOTTOM NAVIGATION BAR -->
+  <nav class="lg:hidden h-14 bg-[#101012] border-t border-[#27272a] flex items-center justify-around px-1 shrink-0 z-50 overflow-x-auto no-scrollbar">
+    <button onclick="openMobileTab('media', 'Biblioteca de Mídia')" class="flex flex-col items-center justify-center gap-0.5 text-zinc-300 text-[10px] py-1 px-2 shrink-0">
+      <i class="fa-solid fa-photo-film text-base text-[#00e5ff]"></i><span>Mídia</span>
     </button>
-    <button onclick="openMobileTab('audio', 'Áudio e Trilhas')" class="flex flex-col items-center justify-center gap-0.5 text-zinc-300 hover:text-[#00e5ff] text-[10px] py-1 px-2">
-      <i class="fa-solid fa-music text-base text-emerald-400"></i>
-      <span>Áudio</span>
+    <button onclick="openMobileTab('audio', 'Áudio e Trilhas')" class="flex flex-col items-center justify-center gap-0.5 text-zinc-300 text-[10px] py-1 px-2 shrink-0">
+      <i class="fa-solid fa-music text-base text-emerald-400"></i><span>Áudio</span>
     </button>
-    <button onclick="openMobileTab('text', 'Adicionar Texto')" class="flex flex-col items-center justify-center gap-0.5 text-zinc-300 hover:text-[#00e5ff] text-[10px] py-1 px-2">
-      <i class="fa-solid fa-font text-base text-purple-400"></i>
-      <span>Texto</span>
+    <button onclick="openMobileTab('text', 'Adicionar Texto')" class="flex flex-col items-center justify-center gap-0.5 text-zinc-300 text-[10px] py-1 px-2 shrink-0">
+      <i class="fa-solid fa-font text-base text-purple-400"></i><span>Texto</span>
     </button>
-    <button onclick="openMobileTab('captions', 'Legendas Automáticas')" class="flex flex-col items-center justify-center gap-0.5 text-zinc-300 hover:text-[#00e5ff] text-[10px] py-1 px-2">
-      <i class="fa-solid fa-closed-captioning text-base text-amber-400"></i>
-      <span>Legendas</span>
+    <button onclick="openMobileTab('captions', 'Legendas Automáticas')" class="flex flex-col items-center justify-center gap-0.5 text-zinc-300 text-[10px] py-1 px-2 shrink-0">
+      <i class="fa-solid fa-closed-captioning text-base text-amber-400"></i><span>Legendas</span>
     </button>
-    <button onclick="openMobileTab('stickers', 'Stickers & Emojis')" class="flex flex-col items-center justify-center gap-0.5 text-zinc-300 hover:text-[#00e5ff] text-[10px] py-1 px-2">
-      <i class="fa-solid fa-face-smile text-base text-pink-400"></i>
-      <span>Stickers</span>
+    <button onclick="openMobileTab('stickers', 'Stickers & Emojis')" class="flex flex-col items-center justify-center gap-0.5 text-zinc-300 text-[10px] py-1 px-2 shrink-0">
+      <i class="fa-solid fa-face-smile text-base text-pink-400"></i><span>Stickers</span>
     </button>
-    <button onclick="openMobileTab('effects', 'Filtros de Vídeo')" class="flex flex-col items-center justify-center gap-0.5 text-zinc-300 hover:text-[#00e5ff] text-[10px] py-1 px-2">
-      <i class="fa-solid fa-wand-magic-sparkles text-base text-cyan-400"></i>
-      <span>Filtros</span>
+    <button onclick="openMobileTab('effects', 'Filtros de Vídeo')" class="flex flex-col items-center justify-center gap-0.5 text-zinc-300 text-[10px] py-1 px-2 shrink-0">
+      <i class="fa-solid fa-wand-magic-sparkles text-base text-cyan-400"></i><span>Filtros</span>
+    </button>
+    <button onclick="openMobileTab('canvas', 'Fundo da Tela')" class="flex flex-col items-center justify-center gap-0.5 text-zinc-300 text-[10px] py-1 px-2 shrink-0">
+      <i class="fa-solid fa-fill-drip text-base text-indigo-400"></i><span>Fundo</span>
     </button>
   </nav>
 
@@ -352,6 +369,8 @@
       width: 960,
       height: 540,
       aspectRatio: '16:9',
+      bgMode: 'transparent', // transparent | color | blur
+      bgColor: '#000000',
       currentTime: 0,
       duration: 15,
       isPlaying: false,
@@ -366,6 +385,7 @@
     const canvas = document.getElementById('preview-canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     let activeTab = 'media';
+    let activeInspectorTab = 'basic';
     let lastFrameTime = 0;
 
     let recognition = null;
@@ -374,14 +394,9 @@
     let liveInterimText = '';
     let ffmpegInstance = null;
 
-    // Helper unificado para Mouse e Toque (Touch)
     function getClientCoords(e) {
-      if (e.touches && e.touches.length > 0) {
-        return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
-      }
-      if (e.changedTouches && e.changedTouches.length > 0) {
-        return { clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY };
-      }
+      if (e.touches && e.touches.length > 0) return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
+      if (e.changedTouches && e.changedTouches.length > 0) return { clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY };
       return { clientX: e.clientX, clientY: e.clientY };
     }
 
@@ -419,53 +434,28 @@
     }
 
     async function generateBuiltInSamples() {
-      const statusEl = document.getElementById('project-status');
-      if (statusEl) statusEl.textContent = 'Carregando amostras...';
-
       const videoUrl1 = await createSyntheticVideo('neon', 6);
       const vidEl1 = await loadVideoElement(videoUrl1);
-      project.mediaLibrary.push({
-        id: 'sample-vid-1',
-        name: 'Intro_Neon_Loop.webm',
-        type: 'video',
-        url: videoUrl1,
-        duration: 6,
-        element: vidEl1
-      });
+      project.mediaLibrary.push({ id: 'sample-vid-1', name: 'Intro_Neon_Loop.webm', type: 'video', url: videoUrl1, duration: 6, element: vidEl1 });
 
       const videoUrl2 = await createSyntheticVideo('greenscreen', 5);
       const vidEl2 = await loadVideoElement(videoUrl2);
-      project.mediaLibrary.push({
-        id: 'sample-vid-2',
-        name: 'ChromaKey_Objeto.webm',
-        type: 'video',
-        url: videoUrl2,
-        duration: 5,
-        element: vidEl2
-      });
+      project.mediaLibrary.push({ id: 'sample-vid-2', name: 'ChromaKey_Objeto.webm', type: 'video', url: videoUrl2, duration: 5, element: vidEl2 });
 
       const audioUrl = createSyntheticAudioWav(8);
       const audioEl = new Audio(audioUrl);
-      project.mediaLibrary.push({
-        id: 'sample-aud-1',
-        name: 'Beat_Eletronico.wav',
-        type: 'audio',
-        url: audioUrl,
-        duration: 8,
-        element: audioEl
-      });
+      project.mediaLibrary.push({ id: 'sample-aud-1', name: 'Beat_Eletronico.wav', type: 'audio', url: audioUrl, duration: 8, element: audioEl });
 
       addClipFromMedia(project.mediaLibrary[0], 0);
-      addTextClip('CAPCUT WEB STUDIO', 0.5, 4.5, {
+      addTextClip('CAPCUT PRO STUDIO', 0.5, 4.5, {
         fontSize: 44,
+        fontFamily: 'Inter',
         color: '#ffffff',
         bgColor: '#00e5ff',
         hasBg: true,
         y: 0.78
       });
       addClipFromMedia(project.mediaLibrary[2], 0);
-
-      if (statusEl) statusEl.textContent = 'Pronto';
       switchTab(activeTab);
     }
 
@@ -596,25 +586,99 @@
     });
 
     // ==========================================
-    // MOBILE DRAWER CONTROLS
+    // MOBILE DRAWER & SUB-TABS CONTROLS
     // ==========================================
     function openMobileTab(tab, title) {
       document.getElementById('mobile-drawer-title').textContent = title;
+      document.getElementById('mobile-inspector-subtabs').classList.add('hidden');
+      document.getElementById('mobile-inspector-subtabs').classList.remove('grid');
       switchTab(tab);
-      const drawer = document.getElementById('mobile-drawer');
-      drawer.classList.remove('translate-y-full');
+      document.getElementById('mobile-drawer').classList.remove('translate-y-full');
     }
 
     function openMobileInspector() {
-      document.getElementById('mobile-drawer-title').textContent = 'Editar Clipe';
+      document.getElementById('mobile-drawer-title').textContent = 'Configurar Clipe';
+      document.getElementById('mobile-inspector-subtabs').classList.remove('hidden');
+      document.getElementById('mobile-inspector-subtabs').classList.add('grid');
       renderInspector();
-      const drawer = document.getElementById('mobile-drawer');
-      drawer.classList.remove('translate-y-full');
+      document.getElementById('mobile-drawer').classList.remove('translate-y-full');
     }
 
     function closeMobileDrawer() {
-      const drawer = document.getElementById('mobile-drawer');
-      drawer.classList.add('translate-y-full');
+      document.getElementById('mobile-drawer').classList.add('translate-y-full');
+    }
+
+    function setInspectorTab(itab) {
+      activeInspectorTab = itab;
+      document.querySelectorAll('.itab-btn').forEach((btn) => {
+        const active = btn.dataset.itab === itab;
+        btn.classList.toggle('text-[#00e5ff]', active);
+        btn.classList.toggle('border-b-2', active);
+        btn.classList.toggle('border-[#00e5ff]', active);
+        btn.classList.toggle('text-zinc-400', !active);
+      });
+      renderInspector();
+    }
+
+    // ==========================================
+    // KEYFRAMES (QUADROS-CHAVE ◇)
+    // ==========================================
+    function toggleKeyframeAtPlayhead() {
+      const clip = getSelectedClip();
+      if (!clip || clip.type === 'audio') {
+        alert('Selecione um clipe de vídeo, imagem ou texto na timeline para marcar Keyframes.');
+        return;
+      }
+      const localT = Number((project.currentTime - clip.startTime).toFixed(2));
+      if (localT < 0 || localT > clip.duration) {
+        alert('Posicione a agulha azul dentro do clipe selecionado.');
+        return;
+      }
+
+      if (!clip.keyframes) clip.keyframes = [];
+      const existingIdx = clip.keyframes.findIndex((k) => Math.abs(k.time - localT) < 0.15);
+
+      if (existingIdx >= 0) {
+        clip.keyframes.splice(existingIdx, 1);
+      } else {
+        clip.keyframes.push({
+          time: localT,
+          x: clip.x,
+          y: clip.y,
+          scale: clip.scale,
+          rotation: clip.rotation,
+          opacity: clip.opacity
+        });
+        clip.keyframes.sort((a, b) => a.time - b.time);
+      }
+      saveState();
+      renderTimeline();
+      renderInspector();
+    }
+
+    function getInterpolatedTransform(clip, localTime) {
+      if (!clip.keyframes || clip.keyframes.length === 0) {
+        return { x: clip.x, y: clip.y, scale: clip.scale, rotation: clip.rotation, opacity: clip.opacity };
+      }
+      const kfs = clip.keyframes;
+      if (localTime <= kfs[0].time) return { ...kfs[0] };
+      if (localTime >= kfs[kfs.length - 1].time) return { ...kfs[kfs.length - 1] };
+
+      for (let i = 0; i < kfs.length - 1; i++) {
+        if (localTime >= kfs[i].time && localTime <= kfs[i + 1].time) {
+          const span = kfs[i + 1].time - kfs[i].time || 0.001;
+          const p = (localTime - kfs[i].time) / span;
+          const lerp = (a, b) => a + (b - a) * p;
+          return {
+            x: lerp(kfs[i].x, kfs[i + 1].x),
+            y: lerp(kfs[i].y, kfs[i + 1].y),
+            scale: lerp(kfs[i].scale, kfs[i + 1].scale),
+            rotation: lerp(kfs[i].rotation, kfs[i + 1].rotation),
+            opacity: lerp(kfs[i].opacity, kfs[i + 1].opacity)
+          };
+        }
+      }
+      return { x: clip.x, y: clip.y, scale: clip.scale, rotation: clip.rotation, opacity: clip.opacity };
     }
 
     // ==========================================
@@ -713,7 +777,7 @@
     }
 
     // ==========================================
-    // ABAS DO PAINEL DE FERRAMENTAS (DESKTOP + MOBILE)
+    // ABAS DO PAINEL ESQUERDO
     // ==========================================
     function switchTab(tab) {
       activeTab = tab;
@@ -802,16 +866,16 @@
         `;
       } else if (tab === 'text') {
         const templates = [
-          { label: 'Título Padrão', text: 'SEU TEXTO AQUI', color: '#ffffff', bgColor: '#000000', hasBg: false },
-          { label: 'Legenda TikTok', text: 'LEGENDAS DINÂMICAS', color: '#000000', bgColor: '#00e5ff', hasBg: true },
-          { label: 'Alerta Neon', text: 'NOVIDADE 🔥', color: '#fde047', bgColor: '#dc2626', hasBg: true },
-          { label: 'Minimalista', text: 'Capítulo 01', color: '#e4e4e7', bgColor: '#27272a', hasBg: true }
+          { label: 'Título Padrão', text: 'SEU TEXTO AQUI', fontFamily: 'Inter', color: '#ffffff', bgColor: '#000000', hasBg: false },
+          { label: 'Legenda TikTok', text: 'LEGENDAS DINÂMICAS', fontFamily: 'Anton', color: '#000000', bgColor: '#00e5ff', hasBg: true },
+          { label: 'Alerta Neon', text: 'NOVIDADE 🔥', fontFamily: 'Bebas Neue', color: '#fde047', bgColor: '#dc2626', hasBg: true },
+          { label: 'Editorial Serif', text: 'Capítulo 01', fontFamily: 'Playfair Display', color: '#ffffff', bgColor: '#27272a', hasBg: true }
         ];
         html = `
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
             ${templates.map((t) => `
               <div onclick='addTextClip("${t.text}", project.currentTime, 4, ${JSON.stringify(t)}); closeMobileDrawer();' class="bg-[#1b1b20] hover:border-[#00e5ff] border border-[#27272a] p-3 rounded-lg cursor-pointer flex items-center justify-between">
-                <span class="px-2 py-1 rounded text-xs font-bold" style="color:${t.color}; background:${t.hasBg ? t.bgColor : 'transparent'}">${t.label}</span>
+                <span class="px-2 py-1 rounded text-xs font-bold" style="font-family:${t.fontFamily}; color:${t.color}; background:${t.hasBg ? t.bgColor : 'transparent'}">${t.label}</span>
                 <i class="fa-solid fa-plus text-[#00e5ff] text-xs"></i>
               </div>
             `).join('')}
@@ -820,7 +884,7 @@
       } else if (tab === 'stickers') {
         const emojis = ['🔥', '🚀', '💯', '🎬', '⚡', '❤️', '😂', '👑', '✨', '🎯', '💥', '🎵'];
         html = `
-          <div class="grid grid-cols-6 sm:grid-cols-6 lg:grid-cols-4 gap-2">
+          <div class="grid grid-cols-6 lg:grid-cols-4 gap-2">
             ${emojis.map((em) => `
               <button onclick='addTextClip("${em}", project.currentTime, 3, { fontSize: 72, hasBg: false }); closeMobileDrawer();' class="h-12 bg-[#1b1b20] hover:bg-[#27272a] border border-[#27272a] rounded-lg text-2xl flex items-center justify-center transition">
                 ${em}
@@ -830,11 +894,12 @@
         `;
       } else if (tab === 'effects') {
         const presets = [
-          { name: 'Original', brightness: 100, contrast: 100, saturate: 100, blur: 0 },
-          { name: 'Cinema Moody', brightness: 90, contrast: 130, saturate: 80, blur: 0 },
-          { name: 'Vibrante Pop', brightness: 108, contrast: 115, saturate: 155, blur: 0 },
-          { name: 'Preto & Branco', brightness: 100, contrast: 135, saturate: 0, blur: 0 },
-          { name: 'Sonho Blur', brightness: 110, contrast: 95, saturate: 110, blur: 3 }
+          { name: 'Original', brightness: 100, contrast: 100, saturate: 100, hue: 0, sepia: 0, blur: 0 },
+          { name: 'Cinema Moody', brightness: 90, contrast: 130, saturate: 80, hue: 0, sepia: 15, blur: 0 },
+          { name: 'Vibrante Pop', brightness: 108, contrast: 115, saturate: 160, hue: 0, sepia: 0, blur: 0 },
+          { name: 'Preto & Branco', brightness: 100, contrast: 135, saturate: 0, hue: 0, sepia: 0, blur: 0 },
+          { name: 'Vintage Sépia', brightness: 95, contrast: 110, saturate: 85, hue: 0, sepia: 65, blur: 0 },
+          { name: 'Cyberpunk Neon', brightness: 105, contrast: 125, saturate: 150, hue: 190, sepia: 0, blur: 0 }
         ];
         html = `
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2">
@@ -846,12 +911,30 @@
             `).join('')}
           </div>
         `;
+      } else if (tab === 'canvas') {
+        html = `
+          <div class="space-y-3 bg-[#1b1b20] p-3 rounded-lg border border-[#27272a]">
+            <div class="font-bold text-zinc-200">Tela & Fundo do Projeto</div>
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="project.bgMode='transparent'" class="py-2 rounded border ${project.bgMode === 'transparent' ? 'border-[#00e5ff] bg-[#00e5ff]/15 text-white' : 'border-[#27272a] text-zinc-400'}">Transparente</button>
+              <button onclick="project.bgMode='color'" class="py-2 rounded border ${project.bgMode === 'color' ? 'border-[#00e5ff] bg-[#00e5ff]/15 text-white' : 'border-[#27272a] text-zinc-400'}">Cor Sólida</button>
+              <button onclick="project.bgMode='blur'" class="py-2 rounded border ${project.bgMode === 'blur' ? 'border-[#00e5ff] bg-[#00e5ff]/15 text-white' : 'border-[#27272a] text-zinc-400'}">Fundo Blur</button>
+            </div>
+            <div>
+              <label class="text-zinc-400 block mb-1">Cor de Fundo Sólido</label>
+              <input type="color" value="${project.bgColor}" oninput="project.bgColor=this.value; project.bgMode='color';" class="w-full h-8 bg-transparent cursor-pointer" />
+            </div>
+            <p class="text-[11px] text-zinc-500">Use "Fundo Blur" para preencher bordas pretas em vídeos verticais (9:16).</p>
+          </div>
+        `;
       }
 
       const desktopTarget = document.getElementById('desktop-left-content');
       const mobileTarget = document.getElementById('mobile-drawer-content');
       if (desktopTarget) desktopTarget.innerHTML = html;
-      if (mobileTarget) mobileTarget.innerHTML = html;
+      if (mobileTarget && document.getElementById('mobile-inspector-subtabs').classList.contains('hidden')) {
+        mobileTarget.innerHTML = html;
+      }
     }
 
     // ==========================================
@@ -878,19 +961,32 @@
         offset: 0,
         speed: 1,
         volume: 1,
+        muted: false,
+        fadeInAudio: 0,
+        fadeOutAudio: 0,
         x: 0.5,
         y: 0.5,
         scale: 1,
         rotation: 0,
+        flipH: false,
+        flipV: false,
+        borderRadius: 0,
+        vignette: 0,
+        blendMode: 'source-over',
         opacity: 1,
         brightness: 100,
         contrast: 100,
         saturate: 100,
+        hue: 0,
+        sepia: 0,
+        invert: 0,
         blur: 0,
         chromaKey: false,
         chromaColor: '#00ff00',
         chromaTolerance: 95,
-        transition: 'none'
+        animIn: 'none',
+        animOut: 'none',
+        keyframes: []
       };
       project.clips.push(clip);
       selectClip(clip.id);
@@ -910,16 +1006,53 @@
         y: style.y ?? 0.5,
         scale: 1,
         rotation: 0,
+        flipH: false,
+        flipV: false,
+        blendMode: 'source-over',
         opacity: 1,
         fontSize: style.fontSize || 42,
+        fontFamily: style.fontFamily || 'Inter',
         color: style.color || '#ffffff',
+        strokeColor: '#000000',
+        strokeWidth: 0,
+        shadowBlur: 0,
         bgColor: style.bgColor || '#000000',
         hasBg: style.hasBg ?? false,
-        transition: 'fade'
+        animIn: 'fade',
+        animOut: 'none',
+        keyframes: []
       };
       project.clips.push(clip);
       selectClip(clip.id);
       updateProjectDuration();
+      saveState();
+      renderTimeline();
+    }
+
+    function extractAudioFromSelected() {
+      const clip = getSelectedClip();
+      if (!clip || clip.type !== 'video') {
+        alert('Selecione um clipe de vídeo na timeline para extrair o áudio.');
+        return;
+      }
+      const audioClip = {
+        id: 'clip-aud-' + Date.now(),
+        mediaId: clip.mediaId,
+        name: 'Áudio: ' + clip.name,
+        type: 'audio',
+        track: 'audio',
+        startTime: clip.startTime,
+        duration: clip.duration,
+        offset: clip.offset || 0,
+        speed: clip.speed || 1,
+        volume: clip.volume ?? 1,
+        muted: false,
+        fadeInAudio: 0,
+        fadeOutAudio: 0
+      };
+      clip.muted = true;
+      project.clips.push(audioClip);
+      selectClip(audioClip.id);
       saveState();
       renderTimeline();
     }
@@ -956,6 +1089,7 @@
       secondClip.id = 'clip-' + Date.now();
       secondClip.startTime = t;
       secondClip.duration = secondDur;
+      secondClip.keyframes = [];
       if (secondClip.offset !== undefined) secondClip.offset += firstDur * (clip.speed || 1);
 
       clip.duration = firstDur;
@@ -999,7 +1133,7 @@
     }
 
     // ==========================================
-    // RENDERIZAÇÃO DA TIMELINE (MOUSE + TOUCH)
+    // RENDERIZAÇÃO DA TIMELINE (COM KEYFRAMES ◇)
     // ==========================================
     function renderTimeline() {
       const inner = document.getElementById('timeline-inner');
@@ -1035,9 +1169,14 @@
         el.style.left = `${clip.startTime * project.zoom}px`;
         el.style.width = `${Math.max(24, clip.duration * project.zoom)}px`;
 
+        const kfMarkers = (clip.keyframes || []).map((kf) =>
+          `<div class="absolute bottom-1 w-2 h-2 bg-amber-400 rotate-45 pointer-events-none" style="left:${kf.time * project.zoom}px" title="Keyframe ${kf.time}s"></div>`
+        ).join('');
+
         el.innerHTML = `
           <div class="clip-handle left-0" data-action="trim-left"><div class="w-0.5 h-3 bg-white"></div></div>
-          <span class="text-[10px] sm:text-[11px] font-medium text-white truncate pointer-events-none">${clip.name}</span>
+          <span class="text-[10px] sm:text-[11px] font-medium text-white truncate pointer-events-none">${clip.muted ? '🔇 ' : ''}${clip.name}</span>
+          ${kfMarkers}
           <div class="clip-handle right-0" data-action="trim-right"><div class="w-0.5 h-3 bg-white"></div></div>
         `;
 
@@ -1082,7 +1221,6 @@
 
         el.addEventListener('mousedown', startDrag);
         el.addEventListener('touchstart', startDrag, { passive: false });
-
         trackEl.appendChild(el);
       });
 
@@ -1125,7 +1263,7 @@
     }
 
     // ==========================================
-    // INSPETOR DE PROPRIEDADES (DESKTOP + MOBILE)
+    // INSPETOR COMPLETO POR ABAS
     // ==========================================
     function renderInspector() {
       const badge = document.getElementById('inspector-badge');
@@ -1134,20 +1272,28 @@
       let html = '';
       if (!clip) {
         if (badge) badge.textContent = 'Nenhum';
-        html = `<div class="text-center text-zinc-500 py-8">Toque em um clipe na timeline para editar propriedades.</div>`;
+        html = `<div class="text-center text-zinc-500 py-8">Selecione um clipe na timeline para acessar todas as configurações.</div>`;
       } else {
         if (badge) badge.textContent = clip.type.toUpperCase();
 
-        html = `
-          <div class="space-y-3">
+        if (activeInspectorTab === 'basic') {
+          html = `
             <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
               <div class="font-bold text-zinc-200 flex items-center justify-between">
-                <span>Transformação</span>
+                <span>Transformação & Espelho</span>
                 <button onclick="resetTransform()" class="text-[11px] text-[#00e5ff] hover:underline">Resetar</button>
               </div>
+              <div class="grid grid-cols-2 gap-1.5">
+                <button onclick="updateClipProp('flipH', !getSelectedClip().flipH)" class="py-1.5 rounded border ${clip.flipH ? 'border-[#00e5ff] bg-[#00e5ff]/15 text-white' : 'border-[#27272a] bg-[#101012] text-zinc-300'}">
+                  <i class="fa-solid fa-left-right mr-1"></i> Espelhar H
+                </button>
+                <button onclick="updateClipProp('flipV', !getSelectedClip().flipV)" class="py-1.5 rounded border ${clip.flipV ? 'border-[#00e5ff] bg-[#00e5ff]/15 text-white' : 'border-[#27272a] bg-[#101012] text-zinc-300'}">
+                  <i class="fa-solid fa-up-down mr-1"></i> Inverter V
+                </button>
+              </div>
               <div>
-                <div class="flex justify-between text-zinc-400 mb-1"><span>Escala</span><span>${Math.round(clip.scale * 100)}%</span></div>
-                <input type="range" min="0.1" max="2.5" step="0.05" value="${clip.scale}" oninput="updateClipProp('scale', parseFloat(this.value))" class="w-full" />
+                <div class="flex justify-between text-zinc-400 mb-1"><span>Escala (Zoom)</span><span>${Math.round(clip.scale * 100)}%</span></div>
+                <input type="range" min="0.1" max="3.0" step="0.05" value="${clip.scale}" oninput="updateClipProp('scale', parseFloat(this.value))" class="w-full" />
               </div>
               <div>
                 <div class="flex justify-between text-zinc-400 mb-1"><span>Rotação</span><span>${clip.rotation}°</span></div>
@@ -1157,96 +1303,205 @@
                 <div class="flex justify-between text-zinc-400 mb-1"><span>Opacidade</span><span>${Math.round(clip.opacity * 100)}%</span></div>
                 <input type="range" min="0" max="1" step="0.05" value="${clip.opacity}" oninput="updateClipProp('opacity', parseFloat(this.value))" class="w-full" />
               </div>
-            </div>
-        `;
-
-        if (clip.type === 'text') {
-          html += `
-            <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
-              <div class="font-bold text-zinc-200">Texto & Legenda</div>
-              <input type="text" value="${clip.text}" oninput="updateClipProp('text', this.value)" class="w-full bg-[#101012] border border-[#27272a] rounded px-2.5 py-2 text-white outline-none" />
-              <div>
-                <div class="flex justify-between text-zinc-400 mb-1"><span>Tamanho</span><span>${clip.fontSize}px</span></div>
-                <input type="range" min="18" max="96" value="${clip.fontSize}" oninput="updateClipProp('fontSize', parseInt(this.value))" class="w-full" />
-              </div>
-              <div class="grid grid-cols-2 gap-2">
+              ${clip.type !== 'audio' ? `
                 <div>
-                  <label class="text-zinc-400 block mb-1">Cor Texto</label>
-                  <input type="color" value="${clip.color}" oninput="updateClipProp('color', this.value)" class="w-full h-8 bg-transparent cursor-pointer" />
+                  <label class="text-zinc-400 block mb-1">Modo de Mesclagem (Blend)</label>
+                  <select onchange="updateClipProp('blendMode', this.value)" class="w-full bg-[#101012] border border-[#27272a] rounded px-2 py-1.5 text-white outline-none">
+                    <option value="source-over" ${clip.blendMode === 'source-over' ? 'selected' : ''}>Normal</option>
+                    <option value="screen" ${clip.blendMode === 'screen' ? 'selected' : ''}>Tela (Screen)</option>
+                    <option value="multiply" ${clip.blendMode === 'multiply' ? 'selected' : ''}>Multiplicar (Multiply)</option>
+                    <option value="overlay" ${clip.blendMode === 'overlay' ? 'selected' : ''}>Sobrepor (Overlay)</option>
+                    <option value="lighten" ${clip.blendMode === 'lighten' ? 'selected' : ''}>Clarear (Lighten)</option>
+                    <option value="difference" ${clip.blendMode === 'difference' ? 'selected' : ''}>Diferença</option>
+                  </select>
                 </div>
-                <div>
-                  <label class="text-zinc-400 block mb-1">Cor Fundo</label>
-                  <input type="color" value="${clip.bgColor}" oninput="updateClipProp('bgColor', this.value)" class="w-full h-8 bg-transparent cursor-pointer" />
-                </div>
-              </div>
-              <label class="flex items-center gap-2 text-zinc-300 cursor-pointer pt-1">
-                <input type="checkbox" ${clip.hasBg ? 'checked' : ''} onchange="updateClipProp('hasBg', this.checked)" />
-                Ativar Caixa de Fundo
-              </label>
+              ` : ''}
             </div>
           `;
-        }
 
-        if (clip.type === 'video' || clip.type === 'image') {
-          html += `
-            <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
-              <div class="font-bold text-zinc-200">Ajustes de Cor</div>
+          if (clip.type === 'text') {
+            html += `
+              <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
+                <div class="font-bold text-zinc-200">Tipografia & Estilo</div>
+                <input type="text" value="${clip.text}" oninput="updateClipProp('text', this.value)" class="w-full bg-[#101012] border border-[#27272a] rounded px-2.5 py-1.5 text-white outline-none" />
+                <div>
+                  <label class="text-zinc-400 block mb-1">Fonte</label>
+                  <select onchange="updateClipProp('fontFamily', this.value)" class="w-full bg-[#101012] border border-[#27272a] rounded px-2 py-1.5 text-white outline-none">
+                    <option value="Inter" ${clip.fontFamily === 'Inter' ? 'selected' : ''}>Inter Bold (Padrão)</option>
+                    <option value="Anton" ${clip.fontFamily === 'Anton' ? 'selected' : ''}>Anton Impact</option>
+                    <option value="Bebas Neue" ${clip.fontFamily === 'Bebas Neue' ? 'selected' : ''}>Bebas Neue</option>
+                    <option value="Playfair Display" ${clip.fontFamily === 'Playfair Display' ? 'selected' : ''}>Playfair Serif</option>
+                    <option value="Space Mono" ${clip.fontFamily === 'Space Mono' ? 'selected' : ''}>Space Monospace</option>
+                  </select>
+                </div>
+                <div>
+                  <div class="flex justify-between text-zinc-400 mb-1"><span>Tamanho</span><span>${clip.fontSize}px</span></div>
+                  <input type="range" min="16" max="110" value="${clip.fontSize}" oninput="updateClipProp('fontSize', parseInt(this.value))" class="w-full" />
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                  <div>
+                    <label class="text-zinc-400 block mb-1 text-[10px]">Texto</label>
+                    <input type="color" value="${clip.color}" oninput="updateClipProp('color', this.value)" class="w-full h-7 bg-transparent cursor-pointer" />
+                  </div>
+                  <div>
+                    <label class="text-zinc-400 block mb-1 text-[10px]">Contorno</label>
+                    <input type="color" value="${clip.strokeColor}" oninput="updateClipProp('strokeColor', this.value)" class="w-full h-7 bg-transparent cursor-pointer" />
+                  </div>
+                  <div>
+                    <label class="text-zinc-400 block mb-1 text-[10px]">Fundo</label>
+                    <input type="color" value="${clip.bgColor}" oninput="updateClipProp('bgColor', this.value)" class="w-full h-7 bg-transparent cursor-pointer" />
+                  </div>
+                </div>
+                <div>
+                  <div class="flex justify-between text-zinc-400 mb-1"><span>Espessura Contorno</span><span>${clip.strokeWidth}px</span></div>
+                  <input type="range" min="0" max="12" value="${clip.strokeWidth}" oninput="updateClipProp('strokeWidth', parseInt(this.value))" class="w-full" />
+                </div>
+                <div>
+                  <div class="flex justify-between text-zinc-400 mb-1"><span>Sombra Projetada</span><span>${clip.shadowBlur}px</span></div>
+                  <input type="range" min="0" max="25" value="${clip.shadowBlur}" oninput="updateClipProp('shadowBlur', parseInt(this.value))" class="w-full" />
+                </div>
+                <label class="flex items-center gap-2 text-zinc-300 cursor-pointer pt-1">
+                  <input type="checkbox" ${clip.hasBg ? 'checked' : ''} onchange="updateClipProp('hasBg', this.checked)" />
+                  Caixa de Fundo Arredondada
+                </label>
+              </div>
+            `;
+          }
+        } else if (activeInspectorTab === 'color') {
+          if (clip.type === 'video' || clip.type === 'image') {
+            html = `
+              <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
+                <div class="font-bold text-zinc-200 flex items-center justify-between">
+                  <span>Color Grading & Filtros</span>
+                  <button onclick="applyFilterPreset({brightness:100,contrast:100,saturate:100,hue:0,sepia:0,invert:0,blur:0,vignette:0})" class="text-[11px] text-[#00e5ff] hover:underline">Limpar</button>
+                </div>
+                <div>
+                  <div class="flex justify-between text-zinc-400 mb-1"><span>Brilho</span><span>${clip.brightness}%</span></div>
+                  <input type="range" min="20" max="200" value="${clip.brightness}" oninput="updateClipProp('brightness', parseInt(this.value))" class="w-full" />
+                </div>
+                <div>
+                  <div class="flex justify-between text-zinc-400 mb-1"><span>Contraste</span><span>${clip.contrast}%</span></div>
+                  <input type="range" min="20" max="200" value="${clip.contrast}" oninput="updateClipProp('contrast', parseInt(this.value))" class="w-full" />
+                </div>
+                <div>
+                  <div class="flex justify-between text-zinc-400 mb-1"><span>Saturação</span><span>${clip.saturate}%</span></div>
+                  <input type="range" min="0" max="250" value="${clip.saturate}" oninput="updateClipProp('saturate', parseInt(this.value))" class="w-full" />
+                </div>
+                <div>
+                  <div class="flex justify-between text-zinc-400 mb-1"><span>Matiz / Temperatura (Hue)</span><span>${clip.hue}°</span></div>
+                  <input type="range" min="-180" max="180" value="${clip.hue}" oninput="updateClipProp('hue', parseInt(this.value))" class="w-full" />
+                </div>
+                <div>
+                  <div class="flex justify-between text-zinc-400 mb-1"><span>Desfoque (Blur)</span><span>${clip.blur}px</span></div>
+                  <input type="range" min="0" max="20" value="${clip.blur}" oninput="updateClipProp('blur', parseInt(this.value))" class="w-full" />
+                </div>
+                <div>
+                  <div class="flex justify-between text-zinc-400 mb-1"><span>Vinheta Escura</span><span>${clip.vignette}%</span></div>
+                  <input type="range" min="0" max="100" value="${clip.vignette}" oninput="updateClipProp('vignette', parseInt(this.value))" class="w-full" />
+                </div>
+                <label class="flex items-center gap-2 text-zinc-300 cursor-pointer pt-1">
+                  <input type="checkbox" ${clip.invert ? 'checked' : ''} onchange="updateClipProp('invert', this.checked ? 100 : 0)" />
+                  Inverter Cores (Negativo)
+                </label>
+              </div>
+
+              <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-zinc-200">Chroma Key (Recorte)</span>
+                  <input type="checkbox" ${clip.chromaKey ? 'checked' : ''} onchange="updateClipProp('chromaKey', this.checked)" />
+                </div>
+                ${clip.chromaKey ? `
+                  <div class="flex items-center justify-between">
+                    <span class="text-zinc-400">Cor Alvo</span>
+                    <input type="color" value="${clip.chromaColor}" oninput="updateClipProp('chromaColor', this.value)" class="h-7 w-14 bg-transparent" />
+                  </div>
+                  <div>
+                    <div class="flex justify-between text-zinc-400 mb-1"><span>Tolerância</span><span>${clip.chromaTolerance}</span></div>
+                    <input type="range" min="20" max="180" value="${clip.chromaTolerance}" oninput="updateClipProp('chromaTolerance', parseInt(this.value))" class="w-full" />
+                  </div>
+                ` : '<p class="text-[11px] text-zinc-500">Ative para remover fundo verde/azul.</p>'}
+              </div>
+            `;
+          } else {
+            html = `<div class="text-center text-zinc-500 py-8">Ajustes de cor disponíveis para clipes de vídeo e imagem.</div>`;
+          }
+        } else if (activeInspectorTab === 'anim') {
+          html = `
+            <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-3">
+              <div class="font-bold text-zinc-200">Animações de Entrada e Saída</div>
               <div>
-                <div class="flex justify-between text-zinc-400 mb-1"><span>Brilho</span><span>${clip.brightness}%</span></div>
-                <input type="range" min="20" max="200" value="${clip.brightness}" oninput="updateClipProp('brightness', parseInt(this.value))" class="w-full" />
+                <label class="text-zinc-400 block mb-1">Animação de Entrada (In)</label>
+                <select onchange="updateClipProp('animIn', this.value)" class="w-full bg-[#101012] border border-[#27272a] rounded px-2 py-1.5 text-white outline-none">
+                  <option value="none" ${clip.animIn === 'none' ? 'selected' : ''}>Nenhuma</option>
+                  <option value="fade" ${clip.animIn === 'fade' ? 'selected' : ''}>Fade In (Surgimento)</option>
+                  <option value="zoom" ${clip.animIn === 'zoom' ? 'selected' : ''}>Zoom In</option>
+                  <option value="slideUp" ${clip.animIn === 'slideUp' ? 'selected' : ''}>Deslizar para Cima</option>
+                </select>
               </div>
               <div>
-                <div class="flex justify-between text-zinc-400 mb-1"><span>Contraste</span><span>${clip.contrast}%</span></div>
-                <input type="range" min="20" max="200" value="${clip.contrast}" oninput="updateClipProp('contrast', parseInt(this.value))" class="w-full" />
-              </div>
-              <div>
-                <div class="flex justify-between text-zinc-400 mb-1"><span>Saturação</span><span>${clip.saturate}%</span></div>
-                <input type="range" min="0" max="200" value="${clip.saturate}" oninput="updateClipProp('saturate', parseInt(this.value))" class="w-full" />
+                <label class="text-zinc-400 block mb-1">Animação de Saída (Out)</label>
+                <select onchange="updateClipProp('animOut', this.value)" class="w-full bg-[#101012] border border-[#27272a] rounded px-2 py-1.5 text-white outline-none">
+                  <option value="none" ${clip.animOut === 'none' ? 'selected' : ''}>Nenhuma</option>
+                  <option value="fade" ${clip.animOut === 'fade' ? 'selected' : ''}>Fade Out (Desaparecer)</option>
+                  <option value="zoomOut" ${clip.animOut === 'zoomOut' ? 'selected' : ''}>Zoom Out</option>
+                </select>
               </div>
             </div>
 
             <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
               <div class="flex items-center justify-between">
-                <span class="font-bold text-zinc-200">Chroma Key</span>
-                <input type="checkbox" ${clip.chromaKey ? 'checked' : ''} onchange="updateClipProp('chromaKey', this.checked)" />
+                <span class="font-bold text-zinc-200">Keyframes ◇ (${(clip.keyframes || []).length})</span>
+                <button onclick="toggleKeyframeAtPlayhead()" class="px-2 py-1 rounded bg-[#00e5ff] text-black font-bold text-[10px]">+ Marcar Agora</button>
               </div>
-              ${clip.chromaKey ? `
+              <p class="text-[11px] text-zinc-400">Mova a agulha na timeline, altere posição ou escala e marque Keyframes para animar.</p>
+              <div class="space-y-1 max-h-28 overflow-y-auto">
+                ${(clip.keyframes || []).map((kf, idx) => `
+                  <div class="flex items-center justify-between bg-[#101012] px-2 py-1 rounded text-[11px]">
+                    <span class="text-amber-400">◇ ${kf.time}s (Escala ${Math.round(kf.scale * 100)}%)</span>
+                    <button onclick="getSelectedClip().keyframes.splice(${idx},1); renderTimeline(); renderInspector();" class="text-red-400"><i class="fa-solid fa-xmark"></i></button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        } else if (activeInspectorTab === 'audio') {
+          if (clip.type === 'video' || clip.type === 'audio') {
+            html = `
+              <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
                 <div class="flex items-center justify-between">
-                  <span class="text-zinc-400">Cor Alvo</span>
-                  <input type="color" value="${clip.chromaColor}" oninput="updateClipProp('chromaColor', this.value)" class="h-7 w-14 bg-transparent" />
+                  <span class="font-bold text-zinc-200">Controle de Áudio & Velocidade</span>
+                  <button onclick="updateClipProp('muted', !getSelectedClip().muted); renderTimeline();" class="px-2 py-1 rounded ${clip.muted ? 'bg-red-500 text-white' : 'bg-[#27272a] text-zinc-300'} text-[10px]">
+                    ${clip.muted ? '🔇 Mudo' : '🔊 Ativo'}
+                  </button>
                 </div>
                 <div>
-                  <div class="flex justify-between text-zinc-400 mb-1"><span>Intensidade</span><span>${clip.chromaTolerance}</span></div>
-                  <input type="range" min="20" max="180" value="${clip.chromaTolerance}" oninput="updateClipProp('chromaTolerance', parseInt(this.value))" class="w-full" />
+                  <div class="flex justify-between text-zinc-400 mb-1"><span>Volume</span><span>${Math.round(clip.volume * 100)}%</span></div>
+                  <input type="range" min="0" max="1" step="0.05" value="${clip.volume}" oninput="updateClipProp('volume', parseFloat(this.value))" class="w-full" />
                 </div>
-              ` : '<p class="text-[11px] text-zinc-500">Ative para remover fundo verde.</p>'}
-            </div>
-          `;
-        }
-
-        if (clip.type === 'video' || clip.type === 'audio') {
-          html += `
-            <div class="bg-[#1b1b20] p-3 rounded-lg border border-[#27272a] space-y-2.5">
-              <div class="font-bold text-zinc-200">Velocidade & Áudio</div>
-              <div>
-                <div class="flex justify-between text-zinc-400 mb-1"><span>Velocidade</span><span>${clip.speed}x</span></div>
-                <input type="range" min="0.5" max="2.0" step="0.25" value="${clip.speed}" oninput="updateClipProp('speed', parseFloat(this.value))" class="w-full" />
+                <div>
+                  <div class="flex justify-between text-zinc-400 mb-1"><span>Velocidade (Speed)</span><span>${clip.speed}x</span></div>
+                  <input type="range" min="0.25" max="3.0" step="0.25" value="${clip.speed}" oninput="updateClipProp('speed', parseFloat(this.value))" class="w-full" />
+                </div>
+                <div>
+                  <div class="flex justify-between text-zinc-400 mb-1"><span>Fade In Áudio</span><span>${clip.fadeInAudio || 0}s</span></div>
+                  <input type="range" min="0" max="3" step="0.2" value="${clip.fadeInAudio || 0}" oninput="updateClipProp('fadeInAudio', parseFloat(this.value))" class="w-full" />
+                </div>
+                <div>
+                  <div class="flex justify-between text-zinc-400 mb-1"><span>Fade Out Áudio</span><span>${clip.fadeOutAudio || 0}s</span></div>
+                  <input type="range" min="0" max="3" step="0.2" value="${clip.fadeOutAudio || 0}" oninput="updateClipProp('fadeOutAudio', parseFloat(this.value))" class="w-full" />
+                </div>
               </div>
-              <div>
-                <div class="flex justify-between text-zinc-400 mb-1"><span>Volume</span><span>${Math.round(clip.volume * 100)}%</span></div>
-                <input type="range" min="0" max="1" step="0.05" value="${clip.volume}" oninput="updateClipProp('volume', parseFloat(this.value))" class="w-full" />
-              </div>
-            </div>
-          `;
+            `;
+          } else {
+            html = `<div class="text-center text-zinc-500 py-8">Controles de áudio disponíveis apenas para vídeo e música.</div>`;
+          }
         }
-
-        html += `</div>`;
       }
 
       const desktopInsp = document.getElementById('desktop-inspector-content');
       const mobileDrawer = document.getElementById('mobile-drawer-content');
       if (desktopInsp) desktopInsp.innerHTML = html;
-      if (mobileDrawer && document.getElementById('mobile-drawer-title').textContent === 'Editar Clipe') {
+      if (mobileDrawer && !document.getElementById('mobile-inspector-subtabs').classList.contains('hidden')) {
         mobileDrawer.innerHTML = html;
       }
     }
@@ -1269,6 +1524,8 @@
       clip.y = 0.5;
       clip.scale = 1;
       clip.rotation = 0;
+      clip.flipH = false;
+      clip.flipV = false;
       clip.opacity = 1;
       renderInspector();
     }
@@ -1319,7 +1576,7 @@
     canvas.addEventListener('touchstart', handleCanvasDragStart, { passive: false });
 
     // ==========================================
-    // MOTOR DE RENDERIZAÇÃO (CANVAS + ÁUDIO)
+    // MOTOR DE RENDERIZAÇÃO (CANVAS + ÁUDIO FADES)
     // ==========================================
     function renderLoop(timestamp) {
       if (!lastFrameTime) lastFrameTime = timestamp;
@@ -1348,8 +1605,17 @@
         const active = project.currentTime >= clip.startTime && project.currentTime <= clip.startTime + clip.duration;
 
         if (active) {
-          const targetTime = ((project.currentTime - clip.startTime) * (clip.speed || 1) + (clip.offset || 0)) % media.duration;
-          el.volume = clip.volume ?? 1;
+          const localT = project.currentTime - clip.startTime;
+          const targetTime = (localT * (clip.speed || 1) + (clip.offset || 0)) % media.duration;
+
+          // Volume dinâmico com Fade In / Fade Out
+          let vol = clip.muted ? 0 : (clip.volume ?? 1);
+          if (clip.fadeInAudio > 0 && localT < clip.fadeInAudio) vol *= localT / clip.fadeInAudio;
+          if (clip.fadeOutAudio > 0 && (clip.duration - localT) < clip.fadeOutAudio) {
+            vol *= Math.max(0, (clip.duration - localT) / clip.fadeOutAudio);
+          }
+
+          el.volume = Math.max(0, Math.min(1, vol));
           el.playbackRate = clip.speed || 1;
 
           if (project.isPlaying) {
@@ -1368,6 +1634,23 @@
     function drawCanvasFrame() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // Fundo do Projeto
+      if (project.bgMode === 'color') {
+        ctx.fillStyle = project.bgColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      } else if (project.bgMode === 'blur') {
+        const mainVid = project.clips.find((c) => c.track === 'video' && project.currentTime >= c.startTime && project.currentTime <= c.startTime + c.duration);
+        if (mainVid) {
+          const media = project.mediaLibrary.find((m) => m.id === mainVid.mediaId);
+          if (media && media.element) {
+            ctx.save();
+            ctx.filter = 'blur(24px) brightness(65%)';
+            ctx.drawImage(media.element, -40, -40, canvas.width + 80, canvas.height + 80);
+            ctx.restore();
+          }
+        }
+      }
+
       ['video', 'overlay'].forEach((trackName) => {
         const activeClips = project.clips.filter(
           (c) => c.track === trackName && project.currentTime >= c.startTime && project.currentTime <= c.startTime + c.duration
@@ -1376,21 +1659,32 @@
         activeClips.forEach((clip) => {
           ctx.save();
           const localTime = project.currentTime - clip.startTime;
+          const timeLeft = clip.duration - localTime;
+          const interp = getInterpolatedTransform(clip, localTime);
 
-          let animOpacity = clip.opacity ?? 1;
-          let animScale = clip.scale ?? 1;
-          if (clip.transition === 'fade' && localTime < 0.4) animOpacity *= localTime / 0.4;
-          else if (clip.transition === 'zoom' && localTime < 0.4) animScale *= 0.7 + 0.3 * (localTime / 0.4);
+          let animOpacity = interp.opacity ?? 1;
+          let animScale = interp.scale ?? 1;
+          let animOffsetY = 0;
 
+          // Animação de Entrada
+          if (clip.animIn === 'fade' && localTime < 0.45) animOpacity *= localTime / 0.45;
+          else if (clip.animIn === 'zoom' && localTime < 0.45) animScale *= 0.65 + 0.35 * (localTime / 0.45);
+          else if (clip.animIn === 'slideUp' && localTime < 0.45) animOffsetY = (1 - localTime / 0.45) * 60;
+
+          // Animação de Saída
+          if (clip.animOut === 'fade' && timeLeft < 0.45) animOpacity *= Math.max(0, timeLeft / 0.45);
+          else if (clip.animOut === 'zoomOut' && timeLeft < 0.45) animScale *= 0.7 + 0.3 * Math.max(0, timeLeft / 0.45);
+
+          ctx.globalCompositeOperation = clip.blendMode || 'source-over';
           ctx.globalAlpha = Math.max(0, Math.min(1, animOpacity));
-          ctx.translate(clip.x * canvas.width, clip.y * canvas.height);
-          ctx.rotate(((clip.rotation || 0) * Math.PI) / 180);
-          ctx.scale(animScale, animScale);
+          ctx.translate(interp.x * canvas.width, interp.y * canvas.height + animOffsetY);
+          ctx.rotate(((interp.rotation || 0) * Math.PI) / 180);
+          ctx.scale((clip.flipH ? -1 : 1) * animScale, (clip.flipV ? -1 : 1) * animScale);
 
           if (clip.type === 'video' || clip.type === 'image') {
             const media = project.mediaLibrary.find((m) => m.id === clip.mediaId);
             if (media && media.element) {
-              ctx.filter = `brightness(${clip.brightness}%) contrast(${clip.contrast}%) saturate(${clip.saturate}%) blur(${clip.blur || 0}px)`;
+              ctx.filter = `brightness(${clip.brightness}%) contrast(${clip.contrast}%) saturate(${clip.saturate}%) hue-rotate(${clip.hue || 0}deg) sepia(${clip.sepia || 0}%) invert(${clip.invert || 0}%) blur(${clip.blur || 0}px)`;
               const w = canvas.width;
               const h = canvas.height;
               if (clip.chromaKey) {
@@ -1398,11 +1692,28 @@
               } else {
                 ctx.drawImage(media.element, -w / 2, -h / 2, w, h);
               }
+
+              // Vinheta
+              if (clip.vignette > 0) {
+                ctx.filter = 'none';
+                const rad = ctx.createRadialGradient(0, 0, w * 0.25, 0, 0, w * 0.65);
+                rad.addColorStop(0, 'rgba(0,0,0,0)');
+                rad.addColorStop(1, `rgba(0,0,0,${clip.vignette / 100})`);
+                ctx.fillStyle = rad;
+                ctx.fillRect(-w / 2, -h / 2, w, h);
+              }
             }
           } else if (clip.type === 'text') {
-            ctx.font = `bold ${clip.fontSize}px Inter, sans-serif`;
+            ctx.font = `bold ${clip.fontSize}px "${clip.fontFamily || 'Inter'}", sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+
+            if (clip.shadowBlur > 0) {
+              ctx.shadowColor = 'rgba(0,0,0,0.85)';
+              ctx.shadowBlur = clip.shadowBlur;
+              ctx.shadowOffsetX = 3;
+              ctx.shadowOffsetY = 3;
+            }
 
             if (clip.hasBg) {
               const metrics = ctx.measureText(clip.text);
@@ -1414,11 +1725,19 @@
               ctx.fill();
             }
 
+            if (clip.strokeWidth > 0) {
+              ctx.lineWidth = clip.strokeWidth;
+              ctx.strokeStyle = clip.strokeColor || '#000000';
+              ctx.strokeText(clip.text, 0, 0);
+            }
+
             ctx.fillStyle = clip.color;
             ctx.fillText(clip.text, 0, 0);
           }
 
           if (clip.id === project.selectedClipId && !project.isPlaying) {
+            ctx.filter = 'none';
+            ctx.shadowBlur = 0;
             ctx.strokeStyle = '#00e5ff';
             ctx.lineWidth = 2;
             ctx.setLineDash([6, 4]);
@@ -1571,7 +1890,7 @@
       const btn = document.getElementById('btn-play-pause');
       btn.innerHTML = project.isPlaying
         ? '<i class="fa-solid fa-pause"></i>'
-        : '<i class="fa-solid fa-play ml-0.5"></i>';
+        : '<i class="fa-solid fa-play ml-0.5 text-xs sm:text-sm"></i>';
     }
 
     function seekTo(time) {
@@ -1584,6 +1903,7 @@
       project.aspectRatio = ratio;
       if (ratio === '16:9') { canvas.width = 960; canvas.height = 540; }
       else if (ratio === '9:16') { canvas.width = 405; canvas.height = 720; }
+      else if (ratio === '4:5') { canvas.width = 540; canvas.height = 675; }
       else { canvas.width = 600; canvas.height = 600; }
       fitCanvasToStage();
     }
